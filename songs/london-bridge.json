@@ -1,0 +1,8 @@
+{
+  "title": "London Bridge",
+  "origin": "Traditional English nursery song",
+  "publicDomainNote": "Traditional public-domain tune. The melody here is a compact monophonic version and does not copy a modern arrangement.",
+  "bpm": 116,
+  "key": "C",
+  "steps": ["G4", "A4", "G4", "F4", "E4", "F4", "G4", "D4", "E4", "F4", "E4", "F4", "G4", "G4", "G4", "REST"]
+}

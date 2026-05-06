@@ -1,0 +1,8 @@
+{
+  "title": "Twinkle, Twinkle, Little Star",
+  "origin": "Traditional French melody, English nursery rhyme text by Jane Taylor",
+  "publicDomainNote": "Based on the public-domain traditional melody \"Ah! vous dirai-je, maman\" and a simplified original contour, not a modern arrangement.",
+  "bpm": 120,
+  "key": "C",
+  "steps": ["C4", "C4", "G4", "G4", "A4", "A4", "G4", "REST", "F4", "F4", "E4", "E4", "D4", "D4", "C4", "REST"]
+}

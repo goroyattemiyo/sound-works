@@ -1,0 +1,8 @@
+{
+  "title": "Row, Row, Row Your Boat",
+  "origin": "Traditional American round",
+  "publicDomainNote": "Traditional public-domain melody. This version is reduced to a short single-note line for sequencing use.",
+  "bpm": 108,
+  "key": "C",
+  "steps": ["C4", "C4", "C4", "D4", "E4", "E4", "D4", "E4", "F4", "G4", "C5", "C5", "C5", "G4", "G4", "REST"]
+}

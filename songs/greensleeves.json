@@ -1,0 +1,8 @@
+{
+  "title": "Greensleeves",
+  "origin": "Traditional English folk song",
+  "publicDomainNote": "Traditional melody in the public domain. Sequence is a compact single-note simplification, not a transcription from a modern arrangement.",
+  "bpm": 96,
+  "key": "A minor",
+  "steps": ["A4", "C5", "D5", "E5", "F5", "E5", "D5", "B4", "G4", "A4", "B4", "C5", "A4", "G4", "A4", "REST"]
+}

@@ -1,0 +1,8 @@
+{
+  "title": "Auld Lang Syne",
+  "origin": "Traditional Scottish song",
+  "publicDomainNote": "Traditional Scottish melody in the public domain. The sequence is a brief monophonic simplification rather than a copied printed arrangement.",
+  "bpm": 100,
+  "key": "G",
+  "steps": ["G4", "C5", "C5", "C5", "E5", "D5", "C5", "D5", "E5", "E5", "D5", "C5", "A4", "G4", "A4", "REST"]
+}

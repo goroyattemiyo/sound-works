@@ -1,0 +1,8 @@
+{
+  "title": "Frere Jacques",
+  "origin": "Traditional French nursery song",
+  "publicDomainNote": "Traditional public-domain melody. This file contains a simple single-note sequence, not a modern educational arrangement.",
+  "bpm": 112,
+  "key": "C",
+  "steps": ["C4", "D4", "E4", "C4", "C4", "D4", "E4", "C4", "E4", "F4", "G4", "REST", "E4", "F4", "G4", "REST"]
+}

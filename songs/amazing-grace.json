@@ -1,0 +1,8 @@
+{
+  "title": "Amazing Grace",
+  "origin": "Traditional hymn tune \"New Britain\"",
+  "publicDomainNote": "The tune \"New Britain\" is public domain. This is a simplified melody outline without lyrics and without reference to a modern hymnal arrangement.",
+  "bpm": 84,
+  "key": "G",
+  "steps": ["G4", "C5", "E5", "C5", "E5", "D5", "C5", "A4", "G4", "G4", "A4", "C5", "B4", "G4", "G4", "REST"]
+}

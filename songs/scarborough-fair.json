@@ -1,0 +1,8 @@
+{
+  "title": "Scarborough Fair",
+  "origin": "Traditional English ballad",
+  "publicDomainNote": "Traditional ballad melody in the public domain. This is a short monophonic reduction made for step sequencing.",
+  "bpm": 90,
+  "key": "A minor",
+  "steps": ["A4", "C5", "D5", "A4", "C5", "D5", "E5", "D5", "C5", "A4", "G4", "A4", "C5", "B4", "A4", "REST"]
+}

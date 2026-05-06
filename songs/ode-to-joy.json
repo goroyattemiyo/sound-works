@@ -1,0 +1,8 @@
+{
+  "title": "Ode to Joy",
+  "origin": "Ludwig van Beethoven, Symphony No. 9",
+  "publicDomainNote": "Beethoven's composition is public domain. This file uses a short simplified monophonic phrase, not a copied modern edition.",
+  "bpm": 120,
+  "key": "C",
+  "steps": ["E4", "E4", "F4", "G4", "G4", "F4", "E4", "D4", "C4", "C4", "D4", "E4", "E4", "D4", "D4", "REST"]
+}
