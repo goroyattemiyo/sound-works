@@ -414,6 +414,73 @@
       margin-top: 12px;
     }
 
+    .event-composer {
+      margin-top: 14px;
+      padding: 12px;
+      border: 1px solid rgba(48, 242, 255, 0.22);
+      background: rgba(9, 10, 18, 0.62);
+    }
+
+    .event-composer-title {
+      margin: 0;
+      color: var(--cyan);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+    }
+
+    .event-composer-text {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 0.8rem;
+      line-height: 1.6;
+    }
+
+    .event-composer-controls {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+      gap: 8px;
+      margin-top: 12px;
+      align-items: end;
+    }
+
+    .event-composer-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .event-control {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    .event-select {
+      min-height: 42px;
+      padding: 0 10px;
+      border: 1px solid rgba(48, 242, 255, 0.24);
+      background: rgba(9, 10, 18, 0.78);
+      color: var(--yellow);
+      font: 700 0.95rem/1 "Courier New", Courier, monospace;
+    }
+
+    .event-select:hover,
+    .event-select:focus-visible {
+      border-color: var(--cyan);
+      background: rgba(23, 38, 61, 0.92);
+      box-shadow: 0 0 0 2px rgba(48, 242, 255, 0.14);
+      outline: none;
+    }
+
+    .event-meta {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
     .note-button {
       min-height: 42px;
       padding: 10px 8px;
@@ -605,6 +672,10 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
+      .event-composer-controls {
+        grid-template-columns: 1fr;
+      }
+
       .bpm-input {
         width: 100%;
         max-width: 112px;
@@ -658,6 +729,28 @@
               <div class="step-grid" id="stepGrid"></div>
             </div>
             <p class="step-selection" id="stepSelectionText">SELECTED: NONE</p>
+            <section class="event-composer" aria-labelledby="eventComposerTitle">
+              <h4 class="event-composer-title" id="eventComposerTitle">Melody Input</h4>
+              <p class="event-composer-text">
+                音価と音程を選んで 1 音ずつ追加します。内部では `events` に記録しつつ、互換用に 16 step へ展開します。
+              </p>
+              <div class="event-composer-controls">
+                <label class="event-control" for="lengthSelect">
+                  <span>Length</span>
+                  <select class="event-select" id="lengthSelect"></select>
+                </label>
+                <label class="event-control" for="eventNoteSelect">
+                  <span>Note</span>
+                  <select class="event-select" id="eventNoteSelect"></select>
+                </label>
+                <button class="start-button" type="button" id="addNoteButton" disabled>Add Note</button>
+              </div>
+              <div class="event-composer-actions">
+                <button class="start-button" type="button" id="deleteLastEventButton" disabled>Delete Last</button>
+                <button class="start-button" type="button" id="clearEventsButton" disabled>Clear Events</button>
+              </div>
+              <p class="event-meta" id="eventMetaText">EVENTS: 0 | FILLED: 0/16 STEPS</p>
+            </section>
             <div class="note-selector" id="noteSelector"></div>
           </section>
           <ul class="song-list" id="songList"></ul>
@@ -703,11 +796,24 @@
     const stepGrid = document.querySelector("#stepGrid");
     const stepSelectionText = document.querySelector("#stepSelectionText");
     const noteSelector = document.querySelector("#noteSelector");
+    const lengthSelect = document.querySelector("#lengthSelect");
+    const eventNoteSelect = document.querySelector("#eventNoteSelect");
+    const addNoteButton = document.querySelector("#addNoteButton");
+    const deleteLastEventButton = document.querySelector("#deleteLastEventButton");
+    const clearEventsButton = document.querySelector("#clearEventsButton");
+    const eventMetaText = document.querySelector("#eventMetaText");
     const BPM = 120;
     const TOTAL_STEPS = 16;
     const GATE_TIME = 0.85;
     const STORAGE_KEY = "soundworks-current-song";
     const NOTE_OPTIONS = ["C4", "D4", "E4", "F4", "G4", "A4", "B4", "REST"];
+    const LENGTH_OPTIONS = [
+      { label: "1/16", steps: 1 },
+      { label: "1/8", steps: 2 },
+      { label: "1/4", steps: 4 },
+      { label: "1/2", steps: 8 },
+      { label: "1/1", steps: 16 }
+    ];
     const songFiles = [
       "amazing-grace.json",
       "auld-lang-syne.json",
@@ -761,6 +867,7 @@
         : "BPM: -- | KEY: -- | ORIGIN: --";
       bpmInput.disabled = !currentSong;
       bpmInput.value = currentSong ? String(currentSong.bpm) : "";
+      updateEventComposer();
     }
 
     function setSaveStatus(message, tone = "") {
@@ -794,6 +901,130 @@
       }
 
       return Math.min(240, Math.max(40, Math.round(numericValue)));
+    }
+
+    function getLengthStepCount(length) {
+      const option = LENGTH_OPTIONS.find((item) => item.label === length);
+      return option ? option.steps : 1;
+    }
+
+    function buildExpandedStepsFromEvents(events) {
+      const expandedSteps = [];
+
+      if (!Array.isArray(events)) {
+        return expandedSteps;
+      }
+
+      events.forEach((event) => {
+        const stepCount = getLengthStepCount(event && event.length);
+        const note = event && typeof event.note === "string" ? event.note : "REST";
+
+        for (let index = 0; index < stepCount; index += 1) {
+          expandedSteps.push(note);
+        }
+      });
+
+      return expandedSteps;
+    }
+
+    function buildEventsFromSteps(steps) {
+      if (!Array.isArray(steps)) {
+        return [];
+      }
+
+      return steps.slice(0, TOTAL_STEPS).map((note) => ({
+        note: typeof note === "string" ? note : "REST",
+        length: "1/16"
+      }));
+    }
+
+    function getCurrentSongEvents() {
+      if (!currentSong) {
+        return [];
+      }
+
+      return Array.isArray(currentSong.events)
+        ? currentSong.events
+        : buildEventsFromSteps(currentSong.steps);
+    }
+
+    function ensureCurrentSongEvents() {
+      if (!currentSong) {
+        return [];
+      }
+
+      if (!Array.isArray(currentSong.events)) {
+        currentSong.events = buildEventsFromSteps(currentSong.steps);
+      }
+
+      return currentSong.events;
+    }
+
+    function normalizeSong(songData) {
+      const nextSong = {
+        ...songData,
+        bpm: clampBpm(songData.bpm)
+      };
+
+      const normalizedSteps = Array.isArray(songData.steps)
+        ? songData.steps.slice(0, TOTAL_STEPS)
+        : [];
+
+      while (normalizedSteps.length < TOTAL_STEPS) {
+        normalizedSteps.push("REST");
+      }
+
+      if (Array.isArray(songData.events)) {
+        nextSong.events = songData.events
+          .filter((event) => event && typeof event.note === "string" && typeof event.length === "string")
+          .map((event) => ({
+            note: event.note,
+            length: event.length
+          }));
+      }
+
+      nextSong.steps = normalizedSteps;
+      return nextSong;
+    }
+
+    function syncStepsFromEvents() {
+      if (!currentSong) {
+        return false;
+      }
+
+      const expandedSteps = buildExpandedStepsFromEvents(currentSong.events);
+
+      if (expandedSteps.length > TOTAL_STEPS) {
+        setSaveStatus("EVENTS EXCEED 16 STEPS", "is-error");
+        return false;
+      }
+
+      currentSong.steps = expandedSteps.slice(0, TOTAL_STEPS);
+
+      while (currentSong.steps.length < TOTAL_STEPS) {
+        currentSong.steps.push("REST");
+      }
+
+      if (selectedStepIndex !== null && selectedStepIndex >= currentSong.steps.length) {
+        selectedStepIndex = currentSong.steps.length - 1;
+      }
+
+      return true;
+    }
+
+    function updateEventComposer() {
+      const hasSong = Boolean(currentSong);
+      const events = hasSong ? getCurrentSongEvents() : [];
+      const filledSteps = hasSong ? buildExpandedStepsFromEvents(events).length : 0;
+      const selectedLength = lengthSelect.value || LENGTH_OPTIONS[0].label;
+      const canAdd = hasSong && filledSteps + getLengthStepCount(selectedLength) <= TOTAL_STEPS;
+
+      lengthSelect.disabled = !hasSong;
+      eventNoteSelect.disabled = !hasSong;
+      addNoteButton.disabled = !canAdd;
+      deleteLastEventButton.disabled = !hasSong || events.length === 0;
+      clearEventsButton.disabled = !hasSong || events.length === 0;
+      eventMetaText.textContent = `EVENTS: ${events.length} | FILLED: ${Math.min(filledSteps, TOTAL_STEPS)}/${TOTAL_STEPS} STEPS`;
     }
 
     function loadSavedSongSnapshot() {
@@ -867,7 +1098,72 @@
       renderStepGrid();
       updateSelectedStepDisplay();
       updateNoteSelector();
+      updateEventComposer();
       previewSelectedNote(note);
+    }
+
+    function addEventNote() {
+      if (!currentSong) {
+        return;
+      }
+
+      const nextEvent = {
+        length: lengthSelect.value,
+        note: eventNoteSelect.value
+      };
+      const nextEvents = ensureCurrentSongEvents().slice();
+      const nextFilledSteps = buildExpandedStepsFromEvents(nextEvents).length + getLengthStepCount(nextEvent.length);
+
+      if (nextFilledSteps > TOTAL_STEPS) {
+        setSaveStatus("EVENT DOES NOT FIT 16 STEPS", "is-error");
+        updateEventComposer();
+        return;
+      }
+
+      nextEvents.push(nextEvent);
+      currentSong.events = nextEvents;
+
+      if (!syncStepsFromEvents()) {
+        return;
+      }
+
+      renderStepGrid();
+      updateStatus();
+      updateEventComposer();
+      previewSelectedNote(nextEvent.note);
+      console.debug("Event note added", nextEvent);
+    }
+
+    function deleteLastEvent() {
+      if (!currentSong) {
+        return;
+      }
+
+      const events = ensureCurrentSongEvents();
+
+      if (events.length === 0) {
+        return;
+      }
+
+      events.pop();
+      syncStepsFromEvents();
+      renderStepGrid();
+      updateStatus();
+      updateEventComposer();
+      console.debug("Last event deleted");
+    }
+
+    function clearEvents() {
+      if (!currentSong) {
+        return;
+      }
+
+      currentSong.events = [];
+      syncStepsFromEvents();
+      renderStepGrid();
+      updateStatus();
+      updateEventComposer();
+      console.debug("Events cleared");
     }
 
     function applyCurrentSongBpm(value) {
@@ -948,16 +1244,10 @@
     }
 
     function applyImportedSongData(songData) {
-      const nextSong = {
+      const nextSong = normalizeSong({
         ...songData,
-        bpm: clampBpm(songData.bpm),
-        steps: songData.steps.slice(0, TOTAL_STEPS),
         file: null
-      };
-
-      while (nextSong.steps.length < TOTAL_STEPS) {
-        nextSong.steps.push("REST");
-      }
+      });
 
       currentSong = nextSong;
       selectedSongFile = null;
@@ -1034,6 +1324,31 @@
       updateNoteSelector();
     }
 
+    function renderEventComposer() {
+      lengthSelect.replaceChildren();
+      eventNoteSelect.replaceChildren();
+
+      LENGTH_OPTIONS.forEach((option) => {
+        const element = document.createElement("option");
+
+        element.value = option.label;
+        element.textContent = option.label;
+        lengthSelect.appendChild(element);
+      });
+
+      NOTE_OPTIONS.forEach((note) => {
+        const element = document.createElement("option");
+
+        element.value = note;
+        element.textContent = note;
+        eventNoteSelect.appendChild(element);
+      });
+
+      lengthSelect.value = LENGTH_OPTIONS[0].label;
+      eventNoteSelect.value = NOTE_OPTIONS[0];
+      updateEventComposer();
+    }
+
     function renderStepGrid() {
       stepGrid.replaceChildren();
 
@@ -1042,6 +1357,7 @@
         selectedStepIndex = null;
         updateSelectedStepDisplay();
         updateNoteSelector();
+        updateEventComposer();
         return;
       }
 
@@ -1078,6 +1394,7 @@
       updateStepGridHighlight();
       updateSelectedStepDisplay();
       updateNoteSelector();
+      updateEventComposer();
     }
 
     function stopPlayback() {
@@ -1273,7 +1590,7 @@
             }
 
             const song = await response.json();
-            return { ...song, file };
+            return normalizeSong({ ...song, file });
           })
         );
 
@@ -1282,21 +1599,12 @@
             const restoredSong = songs.find((song) => song.file === savedSongSnapshot.file);
 
             if (restoredSong) {
-              Object.assign(restoredSong, savedSongSnapshot);
+              Object.assign(restoredSong, normalizeSong(savedSongSnapshot));
               selectedSongFile = restoredSong.file;
               currentSong = restoredSong;
             }
           } else {
-            currentSong = {
-              ...savedSongSnapshot,
-              bpm: clampBpm(savedSongSnapshot.bpm),
-              steps: savedSongSnapshot.steps.slice(0, TOTAL_STEPS)
-            };
-
-            while (currentSong.steps.length < TOTAL_STEPS) {
-              currentSong.steps.push("REST");
-            }
-
+            currentSong = normalizeSong(savedSongSnapshot);
             selectedSongFile = null;
           }
 
@@ -1430,6 +1738,36 @@
       readImportFile(importInput.files && importInput.files[0]);
     });
 
+    lengthSelect.addEventListener("change", updateEventComposer);
+    eventNoteSelect.addEventListener("change", updateEventComposer);
+
+    addNoteButton.addEventListener("click", () => {
+      addNoteButton.classList.add("is-pressed");
+      addEventNote();
+
+      window.setTimeout(() => {
+        addNoteButton.classList.remove("is-pressed");
+      }, 160);
+    });
+
+    deleteLastEventButton.addEventListener("click", () => {
+      deleteLastEventButton.classList.add("is-pressed");
+      deleteLastEvent();
+
+      window.setTimeout(() => {
+        deleteLastEventButton.classList.remove("is-pressed");
+      }, 160);
+    });
+
+    clearEventsButton.addEventListener("click", () => {
+      clearEventsButton.classList.add("is-pressed");
+      clearEvents();
+
+      window.setTimeout(() => {
+        clearEventsButton.classList.remove("is-pressed");
+      }, 160);
+    });
+
     const saveGroup = document.querySelector(".save-group");
 
     saveGroup.addEventListener("dragover", (event) => {
@@ -1452,6 +1790,7 @@
     updateCurrentSongDisplay();
     updateSaveStatusDisplay();
     renderNoteSelector();
+    renderEventComposer();
     renderStepGrid();
     loadSongs();
   </script>
