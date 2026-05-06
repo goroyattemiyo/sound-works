@@ -148,6 +148,64 @@
       font-size: 0.92rem;
     }
 
+    .song-panel {
+      margin-top: 28px;
+      max-width: 620px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      background: rgba(18, 21, 37, 0.82);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+    }
+
+    .song-panel-title {
+      margin: 0 0 12px;
+      color: var(--cyan);
+      font-size: 0.9rem;
+      text-transform: uppercase;
+    }
+
+    .song-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      padding: 0;
+      margin: 0;
+      list-style: none;
+    }
+
+    .song-item-button {
+      width: 100%;
+      min-height: 42px;
+      padding: 10px 12px;
+      border: 1px solid rgba(48, 242, 255, 0.24);
+      background: rgba(9, 10, 18, 0.72);
+      color: var(--text);
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+      transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+    }
+
+    .song-item-button:hover,
+    .song-item-button:focus-visible {
+      background: rgba(23, 38, 61, 0.92);
+      border-color: var(--cyan);
+      transform: translateY(-1px);
+      outline: none;
+    }
+
+    .song-item-button.is-selected {
+      border-color: var(--pink);
+      background: rgba(255, 63, 180, 0.16);
+      color: var(--yellow);
+    }
+
+    .song-list-status {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
     .visual {
       min-height: 390px;
       border: 2px solid var(--line);
@@ -244,6 +302,10 @@
       .visual {
         min-height: 270px;
       }
+
+      .song-list {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
@@ -261,6 +323,11 @@
           <button class="start-button" type="button" id="startButton">Start</button>
           <span class="status" id="statusText" aria-live="polite"></span>
         </div>
+        <section class="song-panel" aria-labelledby="songPanelTitle">
+          <h2 class="song-panel-title" id="songPanelTitle">Song List</h2>
+          <p class="song-list-status" id="songListStatus">LOADING SONGS...</p>
+          <ul class="song-list" id="songList"></ul>
+        </section>
       </div>
 
       <div class="visual" aria-hidden="true">
@@ -286,12 +353,61 @@
   <script>
     const startButton = document.querySelector("#startButton");
     const statusText = document.querySelector("#statusText");
+    const songList = document.querySelector("#songList");
+    const songListStatus = document.querySelector("#songListStatus");
+    const BPM = 120;
+    const TOTAL_STEPS = 16;
+    const songFiles = [
+      "amazing-grace.json",
+      "auld-lang-syne.json",
+      "frere-jacques.json",
+      "greensleeves.json",
+      "london-bridge.json",
+      "mary-had-a-little-lamb.json",
+      "ode-to-joy.json",
+      "row-row-row-your-boat.json",
+      "scarborough-fair.json",
+      "twinkle-twinkle-little-star.json"
+    ];
     let audioContext = null;
+    let currentStep = -1;
+    let loopTimerId = null;
+    let selectedSongFile = null;
 
-    function updateAudioStatus() {
-      statusText.textContent = audioContext
-        ? `AUDIO: ${audioContext.state.toUpperCase()}`
-        : "AUDIO: OFF";
+    function getStepLabel() {
+      return currentStep >= 0 ? String(currentStep + 1).padStart(2, "0") : "--";
+    }
+
+    function updateStatus() {
+      const audioState = audioContext ? audioContext.state.toUpperCase() : "OFF";
+      const loopState = loopTimerId ? "ON" : "OFF";
+
+      statusText.textContent =
+        `AUDIO: ${audioState} | LOOP: ${loopState} | STEP: ${getStepLabel()}/${TOTAL_STEPS}`;
+      startButton.textContent = loopTimerId ? "Stop" : "Start";
+    }
+
+    function advanceStep() {
+      currentStep = (currentStep + 1) % TOTAL_STEPS;
+      updateStatus();
+    }
+
+    function startLoop() {
+      const stepDurationMs = (60 / BPM / 4) * 1000;
+
+      advanceStep();
+      loopTimerId = window.setInterval(advanceStep, stepDurationMs);
+      updateStatus();
+    }
+
+    function stopLoop() {
+      if (loopTimerId) {
+        window.clearInterval(loopTimerId);
+        loopTimerId = null;
+      }
+
+      currentStep = -1;
+      updateStatus();
     }
 
     function playTestTone() {
@@ -317,6 +433,57 @@
       oscillator.stop(now + 0.2);
     }
 
+    function renderSongList(songs) {
+      songList.replaceChildren();
+
+      songs.forEach((song) => {
+        const item = document.createElement("li");
+        const button = document.createElement("button");
+
+        button.type = "button";
+        button.className = "song-item-button";
+        button.textContent = song.title;
+        button.dataset.songFile = song.file;
+
+        if (song.file === selectedSongFile) {
+          button.classList.add("is-selected");
+        }
+
+        button.addEventListener("click", () => {
+          selectedSongFile = song.file;
+
+          songList.querySelectorAll(".song-item-button").forEach((element) => {
+            element.classList.toggle("is-selected", element.dataset.songFile === selectedSongFile);
+          });
+        });
+
+        item.appendChild(button);
+        songList.appendChild(item);
+      });
+    }
+
+    async function loadSongs() {
+      try {
+        const songs = await Promise.all(
+          songFiles.map(async (file) => {
+            const response = await fetch(`songs/${file}`);
+
+            if (!response.ok) {
+              throw new Error(`Failed to load ${file}`);
+            }
+
+            const song = await response.json();
+            return { ...song, file };
+          })
+        );
+
+        songListStatus.textContent = "SELECT A SONG";
+        renderSongList(songs);
+      } catch (error) {
+        songListStatus.textContent = "SONG LOAD ERROR";
+      }
+    }
+
     startButton.addEventListener("click", async () => {
       startButton.classList.add("is-pressed");
 
@@ -324,15 +491,21 @@
         if (!audioContext) {
           const AudioContextClass = window.AudioContext || window.webkitAudioContext;
           audioContext = new AudioContextClass();
-          audioContext.addEventListener("statechange", updateAudioStatus);
+          audioContext.addEventListener("statechange", updateStatus);
         }
 
         if (audioContext.state === "suspended") {
           await audioContext.resume();
         }
 
-        updateAudioStatus();
-        playTestTone();
+        if (loopTimerId) {
+          stopLoop();
+        } else {
+          startLoop();
+          playTestTone();
+        }
+
+        updateStatus();
       } catch (error) {
         statusText.textContent = "AUDIO: ERROR";
       }
@@ -341,6 +514,9 @@
         startButton.classList.remove("is-pressed");
       }, 160);
     });
+
+    updateStatus();
+    loadSongs();
   </script>
 </body>
 </html>
