@@ -952,7 +952,7 @@
         ...songData,
         bpm: clampBpm(songData.bpm),
         steps: songData.steps.slice(0, TOTAL_STEPS),
-        file: currentSong && currentSong.file ? currentSong.file : null
+        file: null
       };
 
       while (nextSong.steps.length < TOTAL_STEPS) {
@@ -960,6 +960,7 @@
       }
 
       currentSong = nextSong;
+      selectedSongFile = null;
       selectedStepIndex = 0;
       updateCurrentSongDisplay();
       renderStepGrid();
@@ -994,6 +995,7 @@
         return;
       }
 
+      setSaveStatus("IMPORTING...");
       const reader = new FileReader();
 
       reader.addEventListener("load", () => {
