@@ -198,6 +198,7 @@
       border-color: var(--pink);
       background: rgba(255, 63, 180, 0.16);
       color: var(--yellow);
+      box-shadow: inset 0 0 0 1px rgba(255, 63, 180, 0.38);
     }
 
     .song-list-status {
@@ -229,6 +230,19 @@
       margin-top: 4px;
       color: var(--muted);
       font-size: 0.76rem;
+    }
+
+    .start-button:disabled {
+      cursor: not-allowed;
+      opacity: 0.42;
+      box-shadow:
+        0 0 0 2px #000,
+        3px 3px 0 rgba(255, 63, 180, 0.28);
+    }
+
+    .step-strong {
+      color: var(--yellow);
+      font-weight: 700;
     }
 
     .visual {
@@ -388,6 +402,7 @@
     const currentSongMeta = document.querySelector("#currentSongMeta");
     const BPM = 120;
     const TOTAL_STEPS = 16;
+    const GATE_TIME = 0.85;
     const songFiles = [
       "amazing-grace.json",
       "auld-lang-syne.json",
@@ -415,8 +430,8 @@
       const audioState = audioContext ? audioContext.state.toUpperCase() : "OFF";
       const playState = isPlaying ? "PLAYING" : "IDLE";
 
-      statusText.textContent =
-        `AUDIO: ${audioState} | ${playState} | STEP ${getStepLabel()}/${TOTAL_STEPS}`;
+      statusText.innerHTML =
+        `AUDIO: ${audioState} | ${playState} | STEP <span class="step-strong">${getStepLabel()}</span>/${TOTAL_STEPS}`;
       playButton.textContent = isPlaying ? "Stop" : "Play";
       playButton.disabled = !currentSong;
     }
@@ -427,7 +442,7 @@
         : "CURRENT: NONE";
 
       currentSongMeta.textContent = currentSong
-        ? `BPM: ${currentSong.bpm} | KEY: ${currentSong.key} | ORIGIN: ${currentSong.origin}`
+        ? `BPM ${currentSong.bpm} | KEY ${currentSong.key} | ${currentSong.origin}`
         : "BPM: -- | KEY: -- | ORIGIN: --";
     }
 
@@ -492,14 +507,17 @@
       return 440 * (2 ** ((midiNote - 69) / 12));
     }
 
+    // Short chip-style note with a gated tail so adjacent steps do not blur together.
     function playSquareTone(frequency, duration = 0.2) {
       if (!audioContext || audioContext.state !== "running" || !frequency) {
         return;
       }
 
       const now = audioContext.currentTime;
-      const attackTime = Math.min(0.01, duration * 0.25);
-      const releaseStart = Math.max(now + attackTime, now + duration - 0.03);
+      const gatedDuration = Math.max(0.04, duration * GATE_TIME);
+      const attackTime = Math.min(0.008, gatedDuration * 0.2);
+      const decayEnd = now + Math.min(0.04, gatedDuration * 0.45);
+      const releaseStart = Math.max(decayEnd, now + gatedDuration - 0.03);
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
 
@@ -508,14 +526,15 @@
 
       gainNode.gain.setValueAtTime(0.0001, now);
       gainNode.gain.linearRampToValueAtTime(0.08, now + attackTime);
-      gainNode.gain.linearRampToValueAtTime(0.0001, releaseStart);
-      gainNode.gain.linearRampToValueAtTime(0.0001, now + duration);
+      gainNode.gain.linearRampToValueAtTime(0.055, decayEnd);
+      gainNode.gain.setValueAtTime(0.055, releaseStart);
+      gainNode.gain.linearRampToValueAtTime(0.0001, now + gatedDuration);
 
       oscillator.connect(gainNode);
       gainNode.connect(audioContext.destination);
 
       oscillator.start(now);
-      oscillator.stop(now + duration);
+      oscillator.stop(now + gatedDuration);
     }
 
     function playSongStep(stepIndex, stepDurationMs) {
@@ -615,7 +634,8 @@
         songListStatus.textContent = "SELECT A SONG";
         renderSongList(songs);
       } catch (error) {
-        songListStatus.textContent = "SONG LOAD ERROR";
+        console.error("Song loading failed", error);
+        songListStatus.textContent = "SONGS COULD NOT BE LOADED";
       }
     }
 
@@ -641,6 +661,7 @@
 
         updateStatus();
       } catch (error) {
+        console.error("Start action failed", error);
         statusText.textContent = "AUDIO ERROR: START FAILED";
       }
 
@@ -671,6 +692,7 @@
 
         updateStatus();
       } catch (error) {
+        console.error("Playback action failed", error);
         statusText.textContent = "AUDIO ERROR: PLAYBACK FAILED";
       }
 
