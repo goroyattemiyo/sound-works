@@ -759,6 +759,7 @@
               <div class="event-composer-actions">
                 <button class="start-button" type="button" id="deleteLastEventButton" disabled>Delete Last</button>
                 <button class="start-button" type="button" id="clearEventsButton" disabled>Clear Events</button>
+                <button class="start-button" type="button" id="undoButton" disabled>Undo</button>
               </div>
               <p class="event-meta" id="eventMetaText">EVENTS: 0 | FILLED: 0/16 STEPS</p>
             </section>
@@ -813,11 +814,13 @@
     const addNoteButton = document.querySelector("#addNoteButton");
     const deleteLastEventButton = document.querySelector("#deleteLastEventButton");
     const clearEventsButton = document.querySelector("#clearEventsButton");
+    const undoButton = document.querySelector("#undoButton");
     const eventMetaText = document.querySelector("#eventMetaText");
     const BPM = 120;
     const TOTAL_STEPS = 16;
     const GATE_TIME = 0.85;
     const STORAGE_KEY = "soundworks-current-song";
+    const UNDO_LIMIT = 30;
     const NOTE_OPTIONS = ["C4", "D4", "E4", "F4", "G4", "A4", "B4", "REST"];
     const LENGTH_OPTIONS = [
       { label: "1/16", steps: 1 },
@@ -849,6 +852,74 @@
     let loopEnabled = false;
     let savedSongSnapshot = null;
     let lastSavedLabel = "NOT SAVED";
+    let undoStack = [];
+
+    function cloneSong(song) {
+      return JSON.parse(JSON.stringify(song));
+    }
+
+    function updateUndoButton() {
+      if (!undoButton) {
+        return;
+      }
+
+      undoButton.disabled = undoStack.length === 0;
+    }
+
+    function pushUndoSnapshot(label = "edit") {
+      if (!currentSong) {
+        return;
+      }
+
+      undoStack.push({
+        label,
+        song: cloneSong(currentSong),
+        selectedStepIndex
+      });
+
+      if (undoStack.length > UNDO_LIMIT) {
+        undoStack.shift();
+      }
+
+      updateUndoButton();
+      console.debug("Undo snapshot", { label, count: undoStack.length });
+    }
+
+    function resetUndoStack() {
+      undoStack = [];
+      updateUndoButton();
+    }
+
+    function restoreUndoSnapshot() {
+      const snapshot = undoStack.pop();
+
+      if (!snapshot) {
+        updateUndoButton();
+        return;
+      }
+
+      if (isPlaying) {
+        stopPlayback();
+      }
+
+      currentSong = cloneSong(snapshot.song);
+      selectedSongFile = null;
+      selectedStepIndex = snapshot.selectedStepIndex ?? 0;
+
+      if (!Array.isArray(currentSong.events)) {
+        currentSong.events = buildEventsFromSteps(currentSong.steps);
+      }
+
+      syncStepsFromEvents();
+      updateCurrentSongDisplay();
+      renderStepGrid();
+      renderSongList();
+      updateStatus();
+      setSaveStatus("UNDO OK", "success");
+      updateUndoButton();
+
+      console.debug("Undo restored", snapshot.label);
+    }
 
     function getStepLabel() {
       return currentStep >= 0 ? String(currentStep + 1).padStart(2, "0") : "--";
@@ -1151,6 +1222,7 @@
         return;
       }
 
+      pushUndoSnapshot("edit step note");
       currentSong.steps[selectedStepIndex] = note;
       console.debug("Step note updated", {
         stepIndex: selectedStepIndex,
@@ -1182,6 +1254,7 @@
       }
 
       nextEvents.push(nextEvent);
+      pushUndoSnapshot("add note");
       currentSong.events = nextEvents;
 
       if (!syncStepsFromEvents()) {
@@ -1199,6 +1272,8 @@
       if (!currentSong) {
         return;
       }
+
+      pushUndoSnapshot("delete last event")
 
       const events = ensureCurrentSongEvents();
 
@@ -1219,6 +1294,7 @@
         return;
       }
 
+      pushUndoSnapshot("clear events");
       currentSong.events = [];
       syncStepsFromEvents();
       renderStepGrid();
@@ -1235,6 +1311,7 @@
 
       const nextBpm = clampBpm(value);
 
+      pushUndoSnapshot("edit bpm");
       currentSong.bpm = nextBpm;
       bpmInput.value = String(nextBpm);
       updateCurrentSongDisplay();
@@ -1762,11 +1839,21 @@
     });
 
     newSongButton.addEventListener("click", () => {
+      resetUndoStack();
       newSongButton.classList.add("is-pressed");
       selectSong(createNewSong(), null);
 
       window.setTimeout(() => {
         newSongButton.classList.remove("is-pressed");
+      }, 160);
+    });
+
+    undoButton.addEventListener("click", () => {
+      undoButton.classList.add("is-pressed");
+      restoreUndoSnapshot();
+
+      window.setTimeout(() => {
+        undoButton.classList.remove("is-pressed");
       }, 160);
     });
 
