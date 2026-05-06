@@ -239,6 +239,83 @@
       font-size: 0.76rem;
     }
 
+    .step-grid-panel {
+      margin-top: 16px;
+    }
+
+    .step-grid-title {
+      margin: 0 0 10px;
+      color: var(--cyan);
+      font-size: 0.84rem;
+      text-transform: uppercase;
+    }
+
+    .step-grid-scroll {
+      overflow-x: auto;
+      padding-bottom: 6px;
+    }
+
+    .step-grid {
+      display: grid;
+      grid-template-columns: repeat(16, minmax(56px, 1fr));
+      gap: 8px;
+      min-width: 1024px;
+    }
+
+    .step-cell {
+      min-height: 72px;
+      padding: 10px 8px;
+      border: 1px solid rgba(48, 242, 255, 0.22);
+      background: rgba(9, 10, 18, 0.76);
+      transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+    }
+
+    .step-cell:hover {
+      transform: translateY(-1px);
+      border-color: var(--cyan);
+      background: rgba(23, 38, 61, 0.92);
+    }
+
+    .step-cell.is-rest {
+      border-color: rgba(167, 175, 194, 0.2);
+      background: rgba(12, 14, 24, 0.72);
+    }
+
+    .step-cell.is-active {
+      border-color: var(--yellow);
+      background: rgba(255, 224, 102, 0.16);
+      box-shadow: 0 0 16px rgba(255, 224, 102, 0.14);
+      animation: step-pulse 0.45s ease-out;
+    }
+
+    .step-index {
+      display: block;
+      color: var(--muted);
+      font-size: 0.72rem;
+    }
+
+    .step-note {
+      display: block;
+      margin-top: 8px;
+      color: var(--text);
+      font-size: 0.98rem;
+      font-family: "Courier New", Courier, monospace;
+      font-weight: 700;
+    }
+
+    .step-cell.is-rest .step-note {
+      color: var(--muted);
+    }
+
+    @keyframes step-pulse {
+      0% {
+        transform: scale(0.96);
+      }
+      100% {
+        transform: scale(1);
+      }
+    }
+
     .start-button:disabled {
       cursor: not-allowed;
       opacity: 0.42;
@@ -397,6 +474,12 @@
           <p class="song-list-status" id="songListStatus">LOADING SONGS...</p>
           <p class="song-current" id="currentSongText">CURRENT: NONE</p>
           <p class="song-meta" id="currentSongMeta">BPM: -- | KEY: -- | ORIGIN: --</p>
+          <section class="step-grid-panel" id="stepGridPanel" hidden>
+            <h3 class="step-grid-title">Step Grid</h3>
+            <div class="step-grid-scroll">
+              <div class="step-grid" id="stepGrid"></div>
+            </div>
+          </section>
           <ul class="song-list" id="songList"></ul>
         </section>
       </div>
@@ -430,6 +513,8 @@
     const songListStatus = document.querySelector("#songListStatus");
     const currentSongText = document.querySelector("#currentSongText");
     const currentSongMeta = document.querySelector("#currentSongMeta");
+    const stepGridPanel = document.querySelector("#stepGridPanel");
+    const stepGrid = document.querySelector("#stepGrid");
     const BPM = 120;
     const TOTAL_STEPS = 16;
     const GATE_TIME = 0.85;
@@ -468,6 +553,7 @@
       playButton.disabled = !currentSong;
       loopButton.textContent = loopEnabled ? "Loop On" : "Loop Off";
       loopButton.classList.toggle("is-active", loopEnabled);
+      updateStepGridHighlight();
     }
 
     function updateCurrentSongDisplay() {
@@ -478,6 +564,44 @@
       currentSongMeta.textContent = currentSong
         ? `BPM ${currentSong.bpm} | KEY ${currentSong.key} | ${currentSong.origin}`
         : "BPM: -- | KEY: -- | ORIGIN: --";
+    }
+
+    function updateStepGridHighlight() {
+      stepGrid.querySelectorAll(".step-cell").forEach((element, index) => {
+        element.classList.toggle("is-active", index === currentStep);
+      });
+    }
+
+    function renderStepGrid() {
+      stepGrid.replaceChildren();
+
+      if (!currentSong) {
+        stepGridPanel.hidden = true;
+        return;
+      }
+
+      stepGridPanel.hidden = false;
+
+      currentSong.steps.forEach((note, index) => {
+        const cell = document.createElement("div");
+        const stepIndex = document.createElement("span");
+        const stepNote = document.createElement("span");
+
+        cell.className = "step-cell";
+        if (note === "REST") {
+          cell.classList.add("is-rest");
+        }
+
+        stepIndex.className = "step-index";
+        stepIndex.textContent = `STEP ${String(index + 1).padStart(2, "0")}`;
+        stepNote.className = "step-note";
+        stepNote.textContent = note;
+
+        cell.append(stepIndex, stepNote);
+        stepGrid.appendChild(cell);
+      });
+
+      updateStepGridHighlight();
     }
 
     function stopPlayback() {
@@ -648,6 +772,7 @@
           currentSong = song;
           console.log("currentSong", currentSong);
           updateCurrentSongDisplay();
+          renderStepGrid();
 
           songList.querySelectorAll(".song-item-button").forEach((element) => {
             element.classList.toggle("is-selected", element.dataset.songFile === selectedSongFile);
@@ -757,6 +882,7 @@
 
     updateStatus();
     updateCurrentSongDisplay();
+    renderStepGrid();
     loadSongs();
   </script>
 </body>
