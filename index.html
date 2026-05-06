@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SOUND WORKS</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #090a12;
+      --panel: #121525;
+      --text: #f7f4df;
+      --muted: #a7afc2;
+      --cyan: #30f2ff;
+      --pink: #ff3fb4;
+      --yellow: #ffe066;
+      --line: rgba(48, 242, 255, 0.26);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        linear-gradient(rgba(48, 242, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 63, 180, 0.04) 1px, transparent 1px),
+        radial-gradient(circle at 50% 10%, rgba(48, 242, 255, 0.18), transparent 32rem),
+        var(--bg);
+      background-size: 24px 24px, 24px 24px, auto, auto;
+      color: var(--text);
+      font-family: "Courier New", Courier, monospace;
+      letter-spacing: 0;
+    }
+
+    .page {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 32px 18px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .page::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.035),
+        rgba(255, 255, 255, 0.035) 1px,
+        transparent 1px,
+        transparent 5px
+      );
+      mix-blend-mode: screen;
+    }
+
+    .hero {
+      width: min(980px, 100%);
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 32px;
+      align-items: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-copy {
+      padding: 28px 0;
+    }
+
+    .eyebrow {
+      margin: 0 0 16px;
+      color: var(--cyan);
+      font-size: 0.88rem;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      color: var(--text);
+      font-size: clamp(3rem, 9vw, 6.8rem);
+      line-height: 0.9;
+      text-shadow:
+        4px 0 0 rgba(255, 63, 180, 0.8),
+        -4px 0 0 rgba(48, 242, 255, 0.65),
+        0 6px 0 #000;
+    }
+
+    .description {
+      max-width: 620px;
+      margin: 26px 0 0;
+      color: var(--muted);
+      font-size: clamp(1rem, 2.2vw, 1.18rem);
+      line-height: 1.75;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-top: 34px;
+      flex-wrap: wrap;
+    }
+
+    .start-button {
+      border: 2px solid var(--cyan);
+      background: #101827;
+      color: var(--text);
+      min-height: 52px;
+      padding: 0 28px;
+      font: 700 1rem/1 "Courier New", Courier, monospace;
+      cursor: pointer;
+      box-shadow:
+        0 0 0 2px #000,
+        6px 6px 0 var(--pink),
+        0 0 26px rgba(48, 242, 255, 0.28);
+      transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+    }
+
+    .start-button:hover,
+    .start-button:focus-visible {
+      background: #17263d;
+      transform: translate(-2px, -2px);
+      box-shadow:
+        0 0 0 2px #000,
+        8px 8px 0 var(--pink),
+        0 0 34px rgba(48, 242, 255, 0.42);
+      outline: none;
+    }
+
+    .start-button:active,
+    .start-button.is-pressed {
+      transform: translate(3px, 3px);
+      box-shadow:
+        0 0 0 2px #000,
+        2px 2px 0 var(--pink),
+        0 0 18px rgba(48, 242, 255, 0.2);
+    }
+
+    .status {
+      color: var(--yellow);
+      min-height: 1.4em;
+      font-size: 0.92rem;
+    }
+
+    .visual {
+      min-height: 390px;
+      border: 2px solid var(--line);
+      background:
+        linear-gradient(180deg, rgba(255, 224, 102, 0.1), transparent 38%),
+        linear-gradient(135deg, rgba(255, 63, 180, 0.2), transparent 52%),
+        #0d1020;
+      box-shadow:
+        inset 0 0 0 2px rgba(255, 255, 255, 0.04),
+        0 0 38px rgba(48, 242, 255, 0.15);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .visual::before,
+    .visual::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .visual::before {
+      bottom: 0;
+      width: 120%;
+      height: 48%;
+      background:
+        linear-gradient(var(--line) 2px, transparent 2px),
+        linear-gradient(90deg, var(--line) 2px, transparent 2px);
+      background-size: 100% 30px, 42px 100%;
+      transform: translateX(-50%) perspective(220px) rotateX(58deg);
+      transform-origin: bottom;
+    }
+
+    .visual::after {
+      top: 76px;
+      width: 150px;
+      height: 150px;
+      background:
+        linear-gradient(transparent 47%, rgba(9, 10, 18, 0.85) 48% 54%, transparent 55%),
+        var(--yellow);
+      box-shadow:
+        0 0 42px rgba(255, 224, 102, 0.42),
+        0 0 0 8px rgba(255, 224, 102, 0.08);
+    }
+
+    .bars {
+      position: absolute;
+      left: 24px;
+      right: 24px;
+      bottom: 34px;
+      display: grid;
+      grid-template-columns: repeat(13, 1fr);
+      gap: 8px;
+      align-items: end;
+      height: 120px;
+    }
+
+    .bar {
+      display: block;
+      background: linear-gradient(var(--cyan), var(--pink));
+      box-shadow: 0 0 18px rgba(255, 63, 180, 0.32);
+    }
+
+    .bar:nth-child(1) { height: 34%; }
+    .bar:nth-child(2) { height: 72%; }
+    .bar:nth-child(3) { height: 48%; }
+    .bar:nth-child(4) { height: 86%; }
+    .bar:nth-child(5) { height: 40%; }
+    .bar:nth-child(6) { height: 64%; }
+    .bar:nth-child(7) { height: 100%; }
+    .bar:nth-child(8) { height: 58%; }
+    .bar:nth-child(9) { height: 76%; }
+    .bar:nth-child(10) { height: 44%; }
+    .bar:nth-child(11) { height: 92%; }
+    .bar:nth-child(12) { height: 52%; }
+    .bar:nth-child(13) { height: 68%; }
+
+    @media (max-width: 760px) {
+      .page {
+        place-items: start center;
+        padding-top: 42px;
+      }
+
+      .hero {
+        grid-template-columns: 1fr;
+        gap: 26px;
+      }
+
+      .hero-copy {
+        padding: 0;
+      }
+
+      .visual {
+        min-height: 270px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="eyebrow">8-bit sound lab</p>
+        <h1 id="hero-title">SOUND WORKS</h1>
+        <p class="description">
+          レトロゲーム機の光と波形をモチーフにした、チップチューン制作のための小さなサウンドワークスペースです。
+          シンプルな操作で、懐かしく鋭い電子音の世界を組み立てていきます。
+        </p>
+        <div class="actions">
+          <button class="start-button" type="button" id="startButton">Start</button>
+          <span class="status" id="statusText" aria-live="polite"></span>
+        </div>
+      </div>
+
+      <div class="visual" aria-hidden="true">
+        <div class="bars">
+          <span class="bar"></span>
+          <span class="bar"></span>
+          <span class="bar"></span>
+          <span class="bar"></span>
+          <span class="bar"></span>
+          <span class="bar"></span>
+          <span class="bar"></span>
+          <span class="bar"></span>
+          <span class="bar"></span>
+          <span class="bar"></span>
+          <span class="bar"></span>
+          <span class="bar"></span>
+          <span class="bar"></span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const startButton = document.querySelector("#startButton");
+    const statusText = document.querySelector("#statusText");
+
+    startButton.addEventListener("click", () => {
+      startButton.classList.add("is-pressed");
+      statusText.textContent = "READY";
+
+      window.setTimeout(() => {
+        startButton.classList.remove("is-pressed");
+      }, 160);
+    });
+  </script>
+</body>
+</html>
