@@ -206,6 +206,12 @@
       font-size: 0.92rem;
     }
 
+    .song-current {
+      margin: 0 0 12px;
+      color: var(--yellow);
+      font-size: 0.92rem;
+    }
+
     .visual {
       min-height: 390px;
       border: 2px solid var(--line);
@@ -326,6 +332,7 @@
         <section class="song-panel" aria-labelledby="songPanelTitle">
           <h2 class="song-panel-title" id="songPanelTitle">Song List</h2>
           <p class="song-list-status" id="songListStatus">LOADING SONGS...</p>
+          <p class="song-current" id="currentSongText">CURRENT: NONE</p>
           <ul class="song-list" id="songList"></ul>
         </section>
       </div>
@@ -355,6 +362,7 @@
     const statusText = document.querySelector("#statusText");
     const songList = document.querySelector("#songList");
     const songListStatus = document.querySelector("#songListStatus");
+    const currentSongText = document.querySelector("#currentSongText");
     const BPM = 120;
     const TOTAL_STEPS = 16;
     const songFiles = [
@@ -373,6 +381,7 @@
     let currentStep = -1;
     let loopTimerId = null;
     let selectedSongFile = null;
+    let currentSong = null;
 
     function getStepLabel() {
       return currentStep >= 0 ? String(currentStep + 1).padStart(2, "0") : "--";
@@ -385,6 +394,12 @@
       statusText.textContent =
         `AUDIO: ${audioState} | LOOP: ${loopState} | STEP: ${getStepLabel()}/${TOTAL_STEPS}`;
       startButton.textContent = loopTimerId ? "Stop" : "Start";
+    }
+
+    function updateCurrentSongDisplay() {
+      currentSongText.textContent = currentSong
+        ? `CURRENT: ${currentSong.title}`
+        : "CURRENT: NONE";
     }
 
     function advanceStep() {
@@ -451,6 +466,9 @@
 
         button.addEventListener("click", () => {
           selectedSongFile = song.file;
+          currentSong = song;
+          console.log("currentSong", currentSong);
+          updateCurrentSongDisplay();
 
           songList.querySelectorAll(".song-item-button").forEach((element) => {
             element.classList.toggle("is-selected", element.dataset.songFile === selectedSongFile);
@@ -516,6 +534,7 @@
     });
 
     updateStatus();
+    updateCurrentSongDisplay();
     loadSongs();
   </script>
 </body>
