@@ -263,15 +263,16 @@
     }
 
     .step-cell {
-      min-height: 72px;
-      padding: 10px 8px;
+      min-height: 76px;
+      padding: 12px 10px;
       border: 1px solid rgba(48, 242, 255, 0.22);
       background: rgba(9, 10, 18, 0.76);
-      transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+      transition: transform 120ms ease, border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+      cursor: pointer;
     }
 
     .step-cell:hover {
-      transform: translateY(-1px);
+      transform: translateY(-2px);
       border-color: var(--cyan);
       background: rgba(23, 38, 61, 0.92);
     }
@@ -286,6 +287,20 @@
       background: rgba(255, 224, 102, 0.16);
       box-shadow: 0 0 16px rgba(255, 224, 102, 0.14);
       animation: step-pulse 0.45s ease-out;
+    }
+
+    .step-cell.is-selected {
+      border-color: var(--pink);
+      background: rgba(255, 63, 180, 0.16);
+      box-shadow: inset 0 0 0 1px rgba(255, 63, 180, 0.42), 0 0 18px rgba(255, 63, 180, 0.12);
+      animation: step-select 0.2s ease-out;
+    }
+
+    .step-cell.is-selected.is-active {
+      border-color: var(--yellow);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 63, 180, 0.42),
+        0 0 18px rgba(255, 224, 102, 0.2);
     }
 
     .step-index {
@@ -307,9 +322,30 @@
       color: var(--muted);
     }
 
+    .step-selection {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.5;
+    }
+
+    .step-selection strong {
+      color: var(--yellow);
+      font-weight: 700;
+    }
+
     @keyframes step-pulse {
       0% {
         transform: scale(0.96);
+      }
+      100% {
+        transform: scale(1);
+      }
+    }
+
+    @keyframes step-select {
+      0% {
+        transform: scale(0.98);
       }
       100% {
         transform: scale(1);
@@ -479,6 +515,7 @@
             <div class="step-grid-scroll">
               <div class="step-grid" id="stepGrid"></div>
             </div>
+            <p class="step-selection" id="stepSelectionText">SELECTED: NONE</p>
           </section>
           <ul class="song-list" id="songList"></ul>
         </section>
@@ -515,6 +552,7 @@
     const currentSongMeta = document.querySelector("#currentSongMeta");
     const stepGridPanel = document.querySelector("#stepGridPanel");
     const stepGrid = document.querySelector("#stepGrid");
+    const stepSelectionText = document.querySelector("#stepSelectionText");
     const BPM = 120;
     const TOTAL_STEPS = 16;
     const GATE_TIME = 0.85;
@@ -535,6 +573,7 @@
     let playbackTimerId = null;
     let selectedSongFile = null;
     let currentSong = null;
+    let selectedStepIndex = null;
     let isPlaying = false;
     let loopEnabled = false;
 
@@ -569,7 +608,18 @@
     function updateStepGridHighlight() {
       stepGrid.querySelectorAll(".step-cell").forEach((element, index) => {
         element.classList.toggle("is-active", index === currentStep);
+        element.classList.toggle("is-selected", index === selectedStepIndex);
       });
+    }
+
+    function updateSelectedStepDisplay() {
+      if (!currentSong || selectedStepIndex === null || !currentSong.steps[selectedStepIndex]) {
+        stepSelectionText.textContent = "SELECTED: NONE";
+        return;
+      }
+
+      stepSelectionText.innerHTML =
+        `SELECTED: <strong>STEP ${String(selectedStepIndex + 1).padStart(2, "0")}</strong> | NOTE <strong>${currentSong.steps[selectedStepIndex]}</strong>`;
     }
 
     function renderStepGrid() {
@@ -577,6 +627,8 @@
 
       if (!currentSong) {
         stepGridPanel.hidden = true;
+        selectedStepIndex = null;
+        updateSelectedStepDisplay();
         return;
       }
 
@@ -596,12 +648,21 @@
         stepIndex.textContent = `STEP ${String(index + 1).padStart(2, "0")}`;
         stepNote.className = "step-note";
         stepNote.textContent = note;
+        cell.setAttribute("role", "button");
+        cell.setAttribute("tabindex", "0");
+
+        cell.addEventListener("click", () => {
+          selectedStepIndex = index;
+          updateStepGridHighlight();
+          updateSelectedStepDisplay();
+        });
 
         cell.append(stepIndex, stepNote);
         stepGrid.appendChild(cell);
       });
 
       updateStepGridHighlight();
+      updateSelectedStepDisplay();
     }
 
     function stopPlayback() {
@@ -770,6 +831,7 @@
         button.addEventListener("click", () => {
           selectedSongFile = song.file;
           currentSong = song;
+          selectedStepIndex = 0;
           console.log("currentSong", currentSong);
           updateCurrentSongDisplay();
           renderStepGrid();
