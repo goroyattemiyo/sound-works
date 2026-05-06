@@ -235,6 +235,13 @@
       flex-wrap: wrap;
     }
 
+    .save-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
     .bpm-control {
       display: flex;
       align-items: center;
@@ -265,6 +272,20 @@
     .bpm-input:disabled {
       cursor: not-allowed;
       opacity: 0.42;
+    }
+
+    .save-status {
+      color: var(--muted);
+      font-size: 0.78rem;
+      min-height: 1.4em;
+    }
+
+    .save-status.is-success {
+      color: var(--yellow);
+    }
+
+    .save-status.is-error {
+      color: #ff8f8f;
     }
 
     .song-item-title {
@@ -576,6 +597,10 @@
         width: 100%;
         max-width: 112px;
       }
+
+      .save-group {
+        width: 100%;
+      }
     }
   </style>
 </head>
@@ -607,6 +632,10 @@
               <span>BPM</span>
               <input class="bpm-input" id="bpmInput" type="number" min="40" max="240" step="1" inputmode="numeric" disabled>
             </label>
+            <div class="save-group">
+              <button class="start-button" type="button" id="saveButton" disabled>Save</button>
+              <span class="save-status" id="saveStatusText">NOT SAVED</span>
+            </div>
           </div>
           <section class="step-grid-panel" id="stepGridPanel" hidden>
             <h3 class="step-grid-title">Step Grid</h3>
@@ -644,11 +673,13 @@
     const startButton = document.querySelector("#startButton");
     const playButton = document.querySelector("#playButton");
     const loopButton = document.querySelector("#loopButton");
+    const saveButton = document.querySelector("#saveButton");
     const statusText = document.querySelector("#statusText");
     const songList = document.querySelector("#songList");
     const songListStatus = document.querySelector("#songListStatus");
     const currentSongText = document.querySelector("#currentSongText");
     const currentSongMeta = document.querySelector("#currentSongMeta");
+    const saveStatusText = document.querySelector("#saveStatusText");
     const bpmInput = document.querySelector("#bpmInput");
     const stepGridPanel = document.querySelector("#stepGridPanel");
     const stepGrid = document.querySelector("#stepGrid");
@@ -657,6 +688,7 @@
     const BPM = 120;
     const TOTAL_STEPS = 16;
     const GATE_TIME = 0.85;
+    const STORAGE_KEY = "soundworks-current-song";
     const NOTE_OPTIONS = ["C4", "D4", "E4", "F4", "G4", "A4", "B4", "REST"];
     const songFiles = [
       "amazing-grace.json",
@@ -678,6 +710,8 @@
     let selectedStepIndex = null;
     let isPlaying = false;
     let loopEnabled = false;
+    let savedSongSnapshot = null;
+    let lastSavedLabel = "NOT SAVED";
 
     function getStepLabel() {
       return currentStep >= 0 ? String(currentStep + 1).padStart(2, "0") : "--";
@@ -694,6 +728,7 @@
       playButton.disabled = !currentSong;
       loopButton.textContent = loopEnabled ? "Loop On" : "Loop Off";
       loopButton.classList.toggle("is-active", loopEnabled);
+      saveButton.disabled = !currentSong;
       updateStepGridHighlight();
     }
 
@@ -709,6 +744,29 @@
       bpmInput.value = currentSong ? String(currentSong.bpm) : "";
     }
 
+    function setSaveStatus(message, tone = "") {
+      saveStatusText.textContent = message;
+      saveStatusText.classList.remove("is-success", "is-error");
+
+      if (tone) {
+        saveStatusText.classList.add(tone);
+      }
+    }
+
+    function updateSaveStatusDisplay() {
+      if (lastSavedLabel === "NOT SAVED") {
+        setSaveStatus(lastSavedLabel);
+        return;
+      }
+
+      if (lastSavedLabel.includes("FAILED")) {
+        setSaveStatus(lastSavedLabel, "is-error");
+        return;
+      }
+
+      setSaveStatus(lastSavedLabel, "is-success");
+    }
+
     function clampBpm(value) {
       const numericValue = Number(value);
 
@@ -717,6 +775,26 @@
       }
 
       return Math.min(240, Math.max(40, Math.round(numericValue)));
+    }
+
+    function loadSavedSongSnapshot() {
+      try {
+        const raw = window.localStorage.getItem(STORAGE_KEY);
+
+        if (!raw) {
+          console.debug("No saved song found in localStorage");
+          return null;
+        }
+
+        const parsed = JSON.parse(raw);
+        console.debug("Saved song loaded from localStorage", parsed);
+        lastSavedLabel = "RESTORED FROM LOCAL";
+        return parsed;
+      } catch (error) {
+        console.error("Failed to read saved song", error);
+        lastSavedLabel = "RESTORE FAILED";
+        return null;
+      }
     }
 
     function updateStepGridHighlight() {
@@ -789,6 +867,22 @@
         title: currentSong.title,
         bpm: currentSong.bpm
       });
+    }
+
+    function saveCurrentSongToStorage() {
+      if (!currentSong) {
+        return;
+      }
+
+      try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(currentSong));
+        lastSavedLabel = `SAVED ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+        updateSaveStatusDisplay();
+      } catch (error) {
+        console.error("Failed to save current song", error);
+        lastSavedLabel = "SAVE FAILED";
+        updateSaveStatusDisplay();
+      }
     }
 
     function renderNoteSelector() {
@@ -1060,8 +1154,22 @@
           })
         );
 
+        if (savedSongSnapshot && savedSongSnapshot.file) {
+          const restoredSong = songs.find((song) => song.file === savedSongSnapshot.file);
+
+          if (restoredSong) {
+            Object.assign(restoredSong, savedSongSnapshot);
+            selectedSongFile = restoredSong.file;
+            currentSong = restoredSong;
+            selectedStepIndex = 0;
+            updateCurrentSongDisplay();
+            renderStepGrid();
+          }
+        }
+
         songListStatus.textContent = "SELECT A SONG";
         renderSongList(songs);
+        updateSaveStatusDisplay();
       } catch (error) {
         console.error("Song loading failed", error);
         songListStatus.textContent = "SONGS COULD NOT BE LOADED";
@@ -1151,8 +1259,19 @@
       }, 160);
     });
 
+    saveButton.addEventListener("click", () => {
+      saveButton.classList.add("is-pressed");
+      saveCurrentSongToStorage();
+
+      window.setTimeout(() => {
+        saveButton.classList.remove("is-pressed");
+      }, 160);
+    });
+
+    savedSongSnapshot = loadSavedSongSnapshot();
     updateStatus();
     updateCurrentSongDisplay();
+    updateSaveStatusDisplay();
     renderNoteSelector();
     renderStepGrid();
     loadSongs();
