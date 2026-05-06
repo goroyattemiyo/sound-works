@@ -334,6 +334,49 @@
       font-weight: 700;
     }
 
+    .note-selector {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .note-button {
+      min-height: 42px;
+      padding: 10px 8px;
+      border: 1px solid rgba(48, 242, 255, 0.22);
+      background: rgba(9, 10, 18, 0.76);
+      color: var(--text);
+      font: inherit;
+      cursor: pointer;
+      transition: transform 120ms ease, border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+    }
+
+    .note-button:hover,
+    .note-button:focus-visible {
+      transform: translateY(-1px);
+      border-color: var(--cyan);
+      background: rgba(23, 38, 61, 0.92);
+      outline: none;
+    }
+
+    .note-button.is-active {
+      border-color: var(--pink);
+      background: rgba(255, 63, 180, 0.16);
+      color: var(--yellow);
+      box-shadow: inset 0 0 0 1px rgba(255, 63, 180, 0.42);
+    }
+
+    .note-button.is-rest {
+      color: var(--muted);
+    }
+
+    .note-button:disabled {
+      cursor: not-allowed;
+      opacity: 0.42;
+      transform: none;
+    }
+
     @keyframes step-pulse {
       0% {
         transform: scale(0.96);
@@ -484,6 +527,10 @@
       .start-button {
         min-width: 108px;
       }
+
+      .note-selector {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
     }
   </style>
 </head>
@@ -516,6 +563,7 @@
               <div class="step-grid" id="stepGrid"></div>
             </div>
             <p class="step-selection" id="stepSelectionText">SELECTED: NONE</p>
+            <div class="note-selector" id="noteSelector"></div>
           </section>
           <ul class="song-list" id="songList"></ul>
         </section>
@@ -553,9 +601,11 @@
     const stepGridPanel = document.querySelector("#stepGridPanel");
     const stepGrid = document.querySelector("#stepGrid");
     const stepSelectionText = document.querySelector("#stepSelectionText");
+    const noteSelector = document.querySelector("#noteSelector");
     const BPM = 120;
     const TOTAL_STEPS = 16;
     const GATE_TIME = 0.85;
+    const NOTE_OPTIONS = ["C4", "D4", "E4", "F4", "G4", "A4", "B4", "REST"];
     const songFiles = [
       "amazing-grace.json",
       "auld-lang-syne.json",
@@ -622,6 +672,69 @@
         `SELECTED: <strong>STEP ${String(selectedStepIndex + 1).padStart(2, "0")}</strong> | NOTE <strong>${currentSong.steps[selectedStepIndex]}</strong>`;
     }
 
+    function updateNoteSelector() {
+      const hasSelection = currentSong && selectedStepIndex !== null;
+      const selectedNote = hasSelection ? currentSong.steps[selectedStepIndex] : null;
+
+      noteSelector.querySelectorAll(".note-button").forEach((element) => {
+        const isActive = hasSelection && element.dataset.note === selectedNote;
+        element.disabled = !hasSelection;
+        element.classList.toggle("is-active", isActive);
+      });
+    }
+
+    function previewSelectedNote(note) {
+      const frequency = noteToFrequency(note);
+
+      if (!frequency || !audioContext || audioContext.state !== "running") {
+        return;
+      }
+
+      playSquareTone(frequency, 0.12);
+    }
+
+    function applySelectedStepNote(note) {
+      if (!currentSong || selectedStepIndex === null) {
+        return;
+      }
+
+      currentSong.steps[selectedStepIndex] = note;
+      console.debug("Step note updated", {
+        stepIndex: selectedStepIndex,
+        note
+      });
+      renderStepGrid();
+      updateSelectedStepDisplay();
+      updateNoteSelector();
+      previewSelectedNote(note);
+    }
+
+    function renderNoteSelector() {
+      noteSelector.replaceChildren();
+
+      NOTE_OPTIONS.forEach((note) => {
+        const button = document.createElement("button");
+
+        button.type = "button";
+        button.className = "note-button";
+        button.textContent = note;
+        button.dataset.note = note;
+        button.disabled = true;
+
+        if (note === "REST") {
+          button.classList.add("is-rest");
+        }
+
+        button.addEventListener("click", () => {
+          applySelectedStepNote(note);
+        });
+
+        noteSelector.appendChild(button);
+      });
+
+      updateNoteSelector();
+    }
+
     function renderStepGrid() {
       stepGrid.replaceChildren();
 
@@ -629,6 +742,7 @@
         stepGridPanel.hidden = true;
         selectedStepIndex = null;
         updateSelectedStepDisplay();
+        updateNoteSelector();
         return;
       }
 
@@ -655,6 +769,7 @@
           selectedStepIndex = index;
           updateStepGridHighlight();
           updateSelectedStepDisplay();
+          updateNoteSelector();
         });
 
         cell.append(stepIndex, stepNote);
@@ -663,6 +778,7 @@
 
       updateStepGridHighlight();
       updateSelectedStepDisplay();
+      updateNoteSelector();
     }
 
     function stopPlayback() {
@@ -944,6 +1060,7 @@
 
     updateStatus();
     updateCurrentSongDisplay();
+    renderNoteSelector();
     renderStepGrid();
     loadSongs();
   </script>
