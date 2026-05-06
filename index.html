@@ -327,6 +327,7 @@
         </p>
         <div class="actions">
           <button class="start-button" type="button" id="startButton">Start</button>
+          <button class="start-button" type="button" id="playButton">Play</button>
           <span class="status" id="statusText" aria-live="polite"></span>
         </div>
         <section class="song-panel" aria-labelledby="songPanelTitle">
@@ -359,6 +360,7 @@
 
   <script>
     const startButton = document.querySelector("#startButton");
+    const playButton = document.querySelector("#playButton");
     const statusText = document.querySelector("#statusText");
     const songList = document.querySelector("#songList");
     const songListStatus = document.querySelector("#songListStatus");
@@ -379,7 +381,7 @@
     ];
     let audioContext = null;
     let currentStep = -1;
-    let loopTimerId = null;
+    let playbackTimerId = null;
     let selectedSongFile = null;
     let currentSong = null;
 
@@ -389,11 +391,10 @@
 
     function updateStatus() {
       const audioState = audioContext ? audioContext.state.toUpperCase() : "OFF";
-      const loopState = loopTimerId ? "ON" : "OFF";
+      const playState = playbackTimerId ? "ON" : "OFF";
 
       statusText.textContent =
-        `AUDIO: ${audioState} | LOOP: ${loopState} | STEP: ${getStepLabel()}/${TOTAL_STEPS}`;
-      startButton.textContent = loopTimerId ? "Stop" : "Start";
+        `AUDIO: ${audioState} | PLAY: ${playState} | STEP: ${getStepLabel()}/${TOTAL_STEPS}`;
     }
 
     function updateCurrentSongDisplay() {
@@ -402,23 +403,10 @@
         : "CURRENT: NONE";
     }
 
-    function advanceStep() {
-      currentStep = (currentStep + 1) % TOTAL_STEPS;
-      updateStatus();
-    }
-
-    function startLoop() {
-      const stepDurationMs = (60 / BPM / 4) * 1000;
-
-      advanceStep();
-      loopTimerId = window.setInterval(advanceStep, stepDurationMs);
-      updateStatus();
-    }
-
-    function stopLoop() {
-      if (loopTimerId) {
-        window.clearInterval(loopTimerId);
-        loopTimerId = null;
+    function stopPlayback() {
+      if (playbackTimerId) {
+        window.clearTimeout(playbackTimerId);
+        playbackTimerId = null;
       }
 
       currentStep = -1;
@@ -475,12 +463,14 @@
       return 440 * (2 ** ((midiNote - 69) / 12));
     }
 
-    function playSquareTone(frequency) {
+    function playSquareTone(frequency, duration = 0.2) {
       if (!audioContext || audioContext.state !== "running" || !frequency) {
         return;
       }
 
       const now = audioContext.currentTime;
+      const attackTime = Math.min(0.01, duration * 0.25);
+      const releaseStart = Math.max(now + attackTime, now + duration - 0.03);
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
 
@@ -488,14 +478,54 @@
       oscillator.frequency.setValueAtTime(frequency, now);
 
       gainNode.gain.setValueAtTime(0.0001, now);
-      gainNode.gain.linearRampToValueAtTime(0.08, now + 0.01);
-      gainNode.gain.linearRampToValueAtTime(0.0001, now + 0.2);
+      gainNode.gain.linearRampToValueAtTime(0.08, now + attackTime);
+      gainNode.gain.linearRampToValueAtTime(0.0001, releaseStart);
+      gainNode.gain.linearRampToValueAtTime(0.0001, now + duration);
 
       oscillator.connect(gainNode);
       gainNode.connect(audioContext.destination);
 
       oscillator.start(now);
-      oscillator.stop(now + 0.2);
+      oscillator.stop(now + duration);
+    }
+
+    function playSongStep(stepIndex, stepDurationMs) {
+      if (!currentSong || stepIndex >= currentSong.steps.length) {
+        stopPlayback();
+        return;
+      }
+
+      currentStep = stepIndex;
+      updateStatus();
+
+      const note = currentSong.steps[stepIndex];
+      const frequency = noteToFrequency(note);
+
+      if (frequency) {
+        playSquareTone(frequency, Math.max(0.08, (stepDurationMs / 1000) * 0.9));
+      }
+
+      if (stepIndex < currentSong.steps.length - 1) {
+        playbackTimerId = window.setTimeout(() => {
+          playSongStep(stepIndex + 1, stepDurationMs);
+        }, stepDurationMs);
+        return;
+      }
+
+      playbackTimerId = window.setTimeout(() => {
+        stopPlayback();
+      }, stepDurationMs);
+    }
+
+    function startPlayback() {
+      if (!currentSong) {
+        return;
+      }
+
+      const stepDurationMs = (60 / currentSong.bpm / 4) * 1000;
+
+      stopPlayback();
+      playSongStep(0, stepDurationMs);
     }
 
     function renderSongList(songs) {
@@ -579,6 +609,31 @@
 
       window.setTimeout(() => {
         startButton.classList.remove("is-pressed");
+      }, 160);
+    });
+
+    playButton.addEventListener("click", async () => {
+      playButton.classList.add("is-pressed");
+
+      try {
+        if (!audioContext) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          audioContext = new AudioContextClass();
+          audioContext.addEventListener("statechange", updateStatus);
+        }
+
+        if (audioContext.state === "suspended") {
+          await audioContext.resume();
+        }
+
+        startPlayback();
+        updateStatus();
+      } catch (error) {
+        statusText.textContent = "AUDIO: ERROR";
+      }
+
+      window.setTimeout(() => {
+        playButton.classList.remove("is-pressed");
       }, 160);
     });
 
