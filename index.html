@@ -227,6 +227,46 @@
       line-height: 1.6;
     }
 
+    .song-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 10px 0 12px;
+      flex-wrap: wrap;
+    }
+
+    .bpm-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .bpm-input {
+      width: 84px;
+      min-height: 38px;
+      padding: 0 10px;
+      border: 1px solid rgba(48, 242, 255, 0.24);
+      background: rgba(9, 10, 18, 0.78);
+      color: var(--yellow);
+      font: 700 0.95rem/1 "Courier New", Courier, monospace;
+      transition: border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+    }
+
+    .bpm-input:hover,
+    .bpm-input:focus-visible {
+      border-color: var(--cyan);
+      background: rgba(23, 38, 61, 0.92);
+      box-shadow: 0 0 0 2px rgba(48, 242, 255, 0.14);
+      outline: none;
+    }
+
+    .bpm-input:disabled {
+      cursor: not-allowed;
+      opacity: 0.42;
+    }
+
     .song-item-title {
       display: block;
       color: inherit;
@@ -258,7 +298,7 @@
     .step-grid {
       display: grid;
       grid-template-columns: repeat(16, minmax(56px, 1fr));
-      gap: 8px;
+      gap: 9px;
       min-width: 1024px;
     }
 
@@ -531,6 +571,11 @@
       .note-selector {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
+
+      .bpm-input {
+        width: 100%;
+        max-width: 112px;
+      }
     }
   </style>
 </head>
@@ -557,6 +602,12 @@
           <p class="song-list-status" id="songListStatus">LOADING SONGS...</p>
           <p class="song-current" id="currentSongText">CURRENT: NONE</p>
           <p class="song-meta" id="currentSongMeta">BPM: -- | KEY: -- | ORIGIN: --</p>
+          <div class="song-controls">
+            <label class="bpm-control" for="bpmInput">
+              <span>BPM</span>
+              <input class="bpm-input" id="bpmInput" type="number" min="40" max="240" step="1" inputmode="numeric" disabled>
+            </label>
+          </div>
           <section class="step-grid-panel" id="stepGridPanel" hidden>
             <h3 class="step-grid-title">Step Grid</h3>
             <div class="step-grid-scroll">
@@ -598,6 +649,7 @@
     const songListStatus = document.querySelector("#songListStatus");
     const currentSongText = document.querySelector("#currentSongText");
     const currentSongMeta = document.querySelector("#currentSongMeta");
+    const bpmInput = document.querySelector("#bpmInput");
     const stepGridPanel = document.querySelector("#stepGridPanel");
     const stepGrid = document.querySelector("#stepGrid");
     const stepSelectionText = document.querySelector("#stepSelectionText");
@@ -653,6 +705,18 @@
       currentSongMeta.textContent = currentSong
         ? `BPM ${currentSong.bpm} | KEY ${currentSong.key} | ${currentSong.origin}`
         : "BPM: -- | KEY: -- | ORIGIN: --";
+      bpmInput.disabled = !currentSong;
+      bpmInput.value = currentSong ? String(currentSong.bpm) : "";
+    }
+
+    function clampBpm(value) {
+      const numericValue = Number(value);
+
+      if (!Number.isFinite(numericValue)) {
+        return 120;
+      }
+
+      return Math.min(240, Math.max(40, Math.round(numericValue)));
     }
 
     function updateStepGridHighlight() {
@@ -707,6 +771,24 @@
       updateSelectedStepDisplay();
       updateNoteSelector();
       previewSelectedNote(note);
+    }
+
+    function applyCurrentSongBpm(value) {
+      if (!currentSong) {
+        bpmInput.value = "";
+        return;
+      }
+
+      const nextBpm = clampBpm(value);
+
+      currentSong.bpm = nextBpm;
+      bpmInput.value = String(nextBpm);
+      updateCurrentSongDisplay();
+      updateStatus();
+      console.debug("Song BPM updated", {
+        title: currentSong.title,
+        bpm: currentSong.bpm
+      });
     }
 
     function renderNoteSelector() {
@@ -1046,6 +1128,17 @@
       window.setTimeout(() => {
         playButton.classList.remove("is-pressed");
       }, 160);
+    });
+
+    bpmInput.addEventListener("change", () => {
+      applyCurrentSongBpm(bpmInput.value);
+    });
+
+    bpmInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        applyCurrentSongBpm(bpmInput.value);
+        bpmInput.blur();
+      }
     });
 
     loopButton.addEventListener("click", () => {
