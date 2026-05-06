@@ -288,6 +288,18 @@
       color: #ff8f8f;
     }
 
+    .io-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .save-group.is-dragover {
+      outline: 1px dashed var(--cyan);
+      outline-offset: 4px;
+    }
+
     .song-item-title {
       display: block;
       color: inherit;
@@ -634,6 +646,9 @@
             </label>
             <div class="save-group">
               <button class="start-button" type="button" id="saveButton" disabled>Save</button>
+              <button class="start-button" type="button" id="exportButton" disabled>Export</button>
+              <button class="start-button" type="button" id="importButton">Import</button>
+              <input id="importInput" type="file" accept="application/json,.json" hidden>
               <span class="save-status" id="saveStatusText">NOT SAVED</span>
             </div>
           </div>
@@ -674,6 +689,9 @@
     const playButton = document.querySelector("#playButton");
     const loopButton = document.querySelector("#loopButton");
     const saveButton = document.querySelector("#saveButton");
+    const exportButton = document.querySelector("#exportButton");
+    const importButton = document.querySelector("#importButton");
+    const importInput = document.querySelector("#importInput");
     const statusText = document.querySelector("#statusText");
     const songList = document.querySelector("#songList");
     const songListStatus = document.querySelector("#songListStatus");
@@ -729,6 +747,7 @@
       loopButton.textContent = loopEnabled ? "Loop On" : "Loop Off";
       loopButton.classList.toggle("is-active", loopEnabled);
       saveButton.disabled = !currentSong;
+      exportButton.disabled = !currentSong;
       updateStepGridHighlight();
     }
 
@@ -883,6 +902,108 @@
         lastSavedLabel = "SAVE FAILED";
         updateSaveStatusDisplay();
       }
+    }
+
+    function exportCurrentSong() {
+      if (!currentSong) {
+        return;
+      }
+
+      const payload = JSON.stringify(currentSong, null, 2);
+      const blob = new Blob([payload], { type: "application/json" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = "soundworks-song.json";
+      link.click();
+      window.URL.revokeObjectURL(url);
+      lastSavedLabel = "EXPORT OK";
+      updateSaveStatusDisplay();
+      console.debug("Song exported", { title: currentSong.title });
+    }
+
+    function validateImportedSong(data) {
+      const isValid =
+        data &&
+        typeof data === "object" &&
+        typeof data.title === "string" &&
+        typeof data.origin === "string" &&
+        typeof data.publicDomainNote === "string" &&
+        Array.isArray(data.steps) &&
+        typeof data.key === "string";
+
+      console.debug("Import validation", {
+        valid: Boolean(isValid),
+        title: data && data.title
+      });
+
+      return isValid;
+    }
+
+    function syncSongSelectionState() {
+      songList.querySelectorAll(".song-item-button").forEach((element) => {
+        element.classList.toggle("is-selected", element.dataset.songFile === selectedSongFile);
+      });
+    }
+
+    function applyImportedSongData(songData) {
+      const nextSong = {
+        ...songData,
+        bpm: clampBpm(songData.bpm),
+        steps: songData.steps.slice(0, TOTAL_STEPS),
+        file: currentSong && currentSong.file ? currentSong.file : null
+      };
+
+      while (nextSong.steps.length < TOTAL_STEPS) {
+        nextSong.steps.push("REST");
+      }
+
+      currentSong = nextSong;
+      selectedStepIndex = 0;
+      updateCurrentSongDisplay();
+      renderStepGrid();
+      updateStatus();
+      syncSongSelectionState();
+      importInput.value = "";
+      lastSavedLabel = "IMPORT OK";
+      updateSaveStatusDisplay();
+      console.debug("Import applied", {
+        title: currentSong.title,
+        bpm: currentSong.bpm
+      });
+    }
+
+    function importSongFromText(text) {
+      try {
+        const parsed = JSON.parse(text);
+
+        if (!validateImportedSong(parsed)) {
+          throw new Error("Invalid song JSON shape");
+        }
+
+        applyImportedSongData(parsed);
+      } catch (error) {
+        console.error("Import failed", error);
+        setSaveStatus("IMPORT FAILED", "is-error");
+      }
+    }
+
+    function readImportFile(file) {
+      if (!file) {
+        return;
+      }
+
+      const reader = new FileReader();
+
+      reader.addEventListener("load", () => {
+        importSongFromText(String(reader.result || ""));
+      });
+      reader.addEventListener("error", () => {
+        console.error("FileReader failed", reader.error);
+        setSaveStatus("IMPORT FAILED", "is-error");
+      });
+      reader.readAsText(file);
     }
 
     function renderNoteSelector() {
@@ -1154,13 +1275,30 @@
           })
         );
 
-        if (savedSongSnapshot && savedSongSnapshot.file) {
-          const restoredSong = songs.find((song) => song.file === savedSongSnapshot.file);
+        if (savedSongSnapshot) {
+          if (savedSongSnapshot.file) {
+            const restoredSong = songs.find((song) => song.file === savedSongSnapshot.file);
 
-          if (restoredSong) {
-            Object.assign(restoredSong, savedSongSnapshot);
-            selectedSongFile = restoredSong.file;
-            currentSong = restoredSong;
+            if (restoredSong) {
+              Object.assign(restoredSong, savedSongSnapshot);
+              selectedSongFile = restoredSong.file;
+              currentSong = restoredSong;
+            }
+          } else {
+            currentSong = {
+              ...savedSongSnapshot,
+              bpm: clampBpm(savedSongSnapshot.bpm),
+              steps: savedSongSnapshot.steps.slice(0, TOTAL_STEPS)
+            };
+
+            while (currentSong.steps.length < TOTAL_STEPS) {
+              currentSong.steps.push("REST");
+            }
+
+            selectedSongFile = null;
+          }
+
+          if (currentSong) {
             selectedStepIndex = 0;
             updateCurrentSongDisplay();
             renderStepGrid();
@@ -1266,6 +1404,45 @@
       window.setTimeout(() => {
         saveButton.classList.remove("is-pressed");
       }, 160);
+    });
+
+    exportButton.addEventListener("click", () => {
+      exportButton.classList.add("is-pressed");
+      exportCurrentSong();
+
+      window.setTimeout(() => {
+        exportButton.classList.remove("is-pressed");
+      }, 160);
+    });
+
+    importButton.addEventListener("click", () => {
+      importButton.classList.add("is-pressed");
+      importInput.click();
+
+      window.setTimeout(() => {
+        importButton.classList.remove("is-pressed");
+      }, 160);
+    });
+
+    importInput.addEventListener("change", () => {
+      readImportFile(importInput.files && importInput.files[0]);
+    });
+
+    const saveGroup = document.querySelector(".save-group");
+
+    saveGroup.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      saveGroup.classList.add("is-dragover");
+    });
+
+    saveGroup.addEventListener("dragleave", () => {
+      saveGroup.classList.remove("is-dragover");
+    });
+
+    saveGroup.addEventListener("drop", (event) => {
+      event.preventDefault();
+      saveGroup.classList.remove("is-dragover");
+      readImportFile(event.dataTransfer && event.dataTransfer.files[0]);
     });
 
     savedSongSnapshot = loadSavedSongSnapshot();
