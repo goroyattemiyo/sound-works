@@ -448,6 +448,56 @@
       oscillator.stop(now + 0.2);
     }
 
+    function noteToFrequency(note) {
+      if (!note || note === "REST") {
+        return null;
+      }
+
+      const match = /^([A-G])(#?)(-?\d+)$/.exec(note);
+
+      if (!match) {
+        return null;
+      }
+
+      const semitoneMap = {
+        C: 0,
+        D: 2,
+        E: 4,
+        F: 5,
+        G: 7,
+        A: 9,
+        B: 11
+      };
+      const [, pitch, sharp, octaveText] = match;
+      const octave = Number(octaveText);
+      const midiNote = (octave + 1) * 12 + semitoneMap[pitch] + (sharp ? 1 : 0);
+
+      return 440 * (2 ** ((midiNote - 69) / 12));
+    }
+
+    function playSquareTone(frequency) {
+      if (!audioContext || audioContext.state !== "running" || !frequency) {
+        return;
+      }
+
+      const now = audioContext.currentTime;
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.type = "square";
+      oscillator.frequency.setValueAtTime(frequency, now);
+
+      gainNode.gain.setValueAtTime(0.0001, now);
+      gainNode.gain.linearRampToValueAtTime(0.08, now + 0.01);
+      gainNode.gain.linearRampToValueAtTime(0.0001, now + 0.2);
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      oscillator.start(now);
+      oscillator.stop(now + 0.2);
+    }
+
     function renderSongList(songs) {
       songList.replaceChildren();
 
@@ -516,10 +566,9 @@
           await audioContext.resume();
         }
 
-        if (loopTimerId) {
-          stopLoop();
+        if (currentSong && currentSong.steps.length > 0) {
+          playSquareTone(noteToFrequency(currentSong.steps[0]));
         } else {
-          startLoop();
           playTestTone();
         }
 
