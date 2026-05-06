@@ -386,6 +386,25 @@
         0 0 18px rgba(255, 224, 102, 0.2);
     }
 
+    .step-cell.is-bar-start {
+      border-left-width: 3px;
+      border-left-color: var(--pink);
+    }
+
+    .step-cell.is-bar-end {
+      border-right-width: 2px;
+      border-right-color: rgba(255, 224, 102, 0.45);
+    }
+
+    .step-bar-label {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--cyan);
+      font-size: 0.68rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
     .step-index {
       display: block;
       color: var(--muted);
@@ -1509,6 +1528,7 @@
 
       currentSong.steps.forEach((note, index) => {
         const cell = document.createElement("div");
+        const stepBarLabel = document.createElement("span");
         const stepIndex = document.createElement("span");
         const stepNote = document.createElement("span");
 
@@ -1517,6 +1537,18 @@
           cell.classList.add("is-rest");
         }
 
+        if (index % 4 === 0) {
+          cell.classList.add("is-bar-start");
+          stepBarLabel.textContent = `BAR ${Math.floor(index / 4) + 1}`;
+        } else {
+          stepBarLabel.textContent = "";
+        }
+
+        if ((index + 1) % 4 === 0) {
+          cell.classList.add("is-bar-end");
+        }
+
+        stepBarLabel.className = "step-bar-label";
         stepIndex.className = "step-index";
         stepIndex.textContent = `STEP ${String(index + 1).padStart(2, "0")}`;
         stepNote.className = "step-note";
@@ -1531,7 +1563,7 @@
           updateNoteSelector();
         });
 
-        cell.append(stepIndex, stepNote);
+        cell.append(stepBarLabel, stepIndex, stepNote);
         stepGrid.appendChild(cell);
       });
 
