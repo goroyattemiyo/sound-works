@@ -286,10 +286,32 @@
   <script>
     const startButton = document.querySelector("#startButton");
     const statusText = document.querySelector("#statusText");
+    let audioContext = null;
 
-    startButton.addEventListener("click", () => {
+    function updateAudioStatus() {
+      statusText.textContent = audioContext
+        ? `AUDIO: ${audioContext.state.toUpperCase()}`
+        : "AUDIO: OFF";
+    }
+
+    startButton.addEventListener("click", async () => {
       startButton.classList.add("is-pressed");
-      statusText.textContent = "READY";
+
+      try {
+        if (!audioContext) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          audioContext = new AudioContextClass();
+          audioContext.addEventListener("statechange", updateAudioStatus);
+        }
+
+        if (audioContext.state === "suspended") {
+          await audioContext.resume();
+        }
+
+        updateAudioStatus();
+      } catch (error) {
+        statusText.textContent = "AUDIO: ERROR";
+      }
 
       window.setTimeout(() => {
         startButton.classList.remove("is-pressed");
