@@ -107,6 +107,13 @@
       flex-wrap: wrap;
     }
 
+    .status-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
     .start-button {
       border: 2px solid var(--cyan);
       background: #101827;
@@ -240,9 +247,20 @@
         3px 3px 0 rgba(255, 63, 180, 0.28);
     }
 
+    .toggle-button.is-active {
+      border-color: var(--yellow);
+      background: rgba(255, 224, 102, 0.16);
+      color: var(--yellow);
+      box-shadow:
+        0 0 0 2px #000,
+        4px 4px 0 rgba(255, 224, 102, 0.36),
+        0 0 24px rgba(255, 224, 102, 0.18);
+    }
+
     .step-strong {
       color: var(--yellow);
       font-weight: 700;
+      font-size: 1.04rem;
     }
 
     .visual {
@@ -345,6 +363,14 @@
       .song-list {
         grid-template-columns: 1fr;
       }
+
+      .actions {
+        gap: 12px;
+      }
+
+      .start-button {
+        min-width: 108px;
+      }
     }
   </style>
 </head>
@@ -361,7 +387,10 @@
         <div class="actions">
           <button class="start-button" type="button" id="startButton">Start</button>
           <button class="start-button" type="button" id="playButton">Play</button>
-          <span class="status" id="statusText" aria-live="polite"></span>
+          <button class="start-button toggle-button" type="button" id="loopButton">Loop Off</button>
+          <div class="status-group">
+            <span class="status" id="statusText" aria-live="polite"></span>
+          </div>
         </div>
         <section class="song-panel" aria-labelledby="songPanelTitle">
           <h2 class="song-panel-title" id="songPanelTitle">Song List</h2>
@@ -395,6 +424,7 @@
   <script>
     const startButton = document.querySelector("#startButton");
     const playButton = document.querySelector("#playButton");
+    const loopButton = document.querySelector("#loopButton");
     const statusText = document.querySelector("#statusText");
     const songList = document.querySelector("#songList");
     const songListStatus = document.querySelector("#songListStatus");
@@ -421,6 +451,7 @@
     let selectedSongFile = null;
     let currentSong = null;
     let isPlaying = false;
+    let loopEnabled = false;
 
     function getStepLabel() {
       return currentStep >= 0 ? String(currentStep + 1).padStart(2, "0") : "--";
@@ -429,11 +460,14 @@
     function updateStatus() {
       const audioState = audioContext ? audioContext.state.toUpperCase() : "OFF";
       const playState = isPlaying ? "PLAYING" : "IDLE";
+      const loopState = loopEnabled ? "LOOP ON" : "LOOP OFF";
 
       statusText.innerHTML =
-        `AUDIO: ${audioState} | ${playState} | STEP <span class="step-strong">${getStepLabel()}</span>/${TOTAL_STEPS}`;
+        `AUDIO: ${audioState} | ${playState} | ${loopState} | STEP <span class="step-strong">${getStepLabel()}</span>/${TOTAL_STEPS}`;
       playButton.textContent = isPlaying ? "Stop" : "Play";
       playButton.disabled = !currentSong;
+      loopButton.textContent = loopEnabled ? "Loop On" : "Loop Off";
+      loopButton.classList.toggle("is-active", loopEnabled);
     }
 
     function updateCurrentSongDisplay() {
@@ -452,6 +486,9 @@
         playbackTimerId = null;
       }
 
+      if (isPlaying) {
+        console.debug("Playback stopped");
+      }
       isPlaying = false;
       currentStep = -1;
       updateStatus();
@@ -561,6 +598,13 @@
       }
 
       playbackTimerId = window.setTimeout(() => {
+        if (loopEnabled) {
+          console.debug("Playback loop restart");
+          playSongStep(0, stepDurationMs);
+          return;
+        }
+
+        console.debug("Playback finished");
         stopPlayback();
       }, stepDurationMs);
     }
@@ -698,6 +742,16 @@
 
       window.setTimeout(() => {
         playButton.classList.remove("is-pressed");
+      }, 160);
+    });
+
+    loopButton.addEventListener("click", () => {
+      loopButton.classList.add("is-pressed");
+      loopEnabled = !loopEnabled;
+      updateStatus();
+
+      window.setTimeout(() => {
+        loopButton.classList.remove("is-pressed");
       }, 160);
     });
 
