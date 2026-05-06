@@ -335,6 +335,16 @@
       min-width: 1024px;
     }
 
+    .step-grid-empty {
+      min-width: 100%;
+      padding: 18px 16px;
+      border: 1px dashed rgba(48, 242, 255, 0.22);
+      color: var(--muted);
+      font-size: 0.82rem;
+      text-align: center;
+      background: rgba(9, 10, 18, 0.4);
+    }
+
     .step-cell {
       min-height: 76px;
       padding: 12px 10px;
@@ -711,6 +721,7 @@
           <p class="song-current" id="currentSongText">CURRENT: NONE</p>
           <p class="song-meta" id="currentSongMeta">BPM: -- | KEY: -- | ORIGIN: --</p>
           <div class="song-controls">
+            <button class="start-button" type="button" id="newSongButton">New Song</button>
             <label class="bpm-control" for="bpmInput">
               <span>BPM</span>
               <input class="bpm-input" id="bpmInput" type="number" min="40" max="240" step="1" inputmode="numeric" disabled>
@@ -781,6 +792,7 @@
     const startButton = document.querySelector("#startButton");
     const playButton = document.querySelector("#playButton");
     const loopButton = document.querySelector("#loopButton");
+    const newSongButton = document.querySelector("#newSongButton");
     const saveButton = document.querySelector("#saveButton");
     const exportButton = document.querySelector("#exportButton");
     const importButton = document.querySelector("#importButton");
@@ -827,6 +839,7 @@
       "twinkle-twinkle-little-star.json"
     ];
     let audioContext = null;
+    let builtInSongs = [];
     let currentStep = -1;
     let playbackTimerId = null;
     let selectedSongFile = null;
@@ -863,7 +876,7 @@
         : "CURRENT: NONE";
 
       currentSongMeta.textContent = currentSong
-        ? `BPM ${currentSong.bpm} | KEY ${currentSong.key} | ${currentSong.origin}`
+        ? `BPM ${currentSong.bpm} | KEY ${currentSong.key} | ${currentSong.origin} | ${currentSong.sourceType === "built-in" ? "BUILT-IN SONG" : "USER SONG"}`
         : "BPM: -- | KEY: -- | ORIGIN: --";
       bpmInput.disabled = !currentSong;
       bpmInput.value = currentSong ? String(currentSong.bpm) : "";
@@ -906,6 +919,32 @@
     function getLengthStepCount(length) {
       const option = LENGTH_OPTIONS.find((item) => item.label === length);
       return option ? option.steps : 1;
+    }
+
+    function cloneSongData(songData) {
+      return JSON.parse(JSON.stringify(songData));
+    }
+
+    function createEditableSong(songData, sourceType = "user") {
+      const nextSong = normalizeSong(cloneSongData(songData));
+
+      nextSong.sourceType = sourceType;
+      return nextSong;
+    }
+
+    function createNewSong() {
+      const nextSong = createEditableSong({
+        title: "New Song",
+        origin: "User",
+        publicDomainNote: "User-created song.",
+        bpm: BPM,
+        key: "C",
+        events: [],
+        steps: []
+      }, "user");
+
+      nextSong.steps = [];
+      return nextSong;
     }
 
     function buildExpandedStepsFromEvents(events) {
@@ -987,9 +1026,31 @@
       return nextSong;
     }
 
+    function selectSong(nextSong, nextSelectedSongFile = null) {
+      stopPlayback();
+      currentSong = nextSong;
+      selectedSongFile = nextSelectedSongFile;
+      selectedStepIndex = 0;
+      updateCurrentSongDisplay();
+      renderStepGrid();
+      updateStatus();
+      syncSongSelectionState();
+      console.debug("Song selected", {
+        title: currentSong && currentSong.title,
+        sourceType: currentSong && currentSong.sourceType,
+        file: selectedSongFile
+      });
+    }
+
     function syncStepsFromEvents() {
       if (!currentSong) {
         return false;
+      }
+
+      if (!Array.isArray(currentSong.events) || currentSong.events.length === 0) {
+        currentSong.steps = [];
+        selectedStepIndex = 0;
+        return true;
       }
 
       const expandedSteps = buildExpandedStepsFromEvents(currentSong.events);
@@ -1244,18 +1305,12 @@
     }
 
     function applyImportedSongData(songData) {
-      const nextSong = normalizeSong({
+      const nextSong = createEditableSong({
         ...songData,
         file: null
-      });
+      }, "user");
 
-      currentSong = nextSong;
-      selectedSongFile = null;
-      selectedStepIndex = 0;
-      updateCurrentSongDisplay();
-      renderStepGrid();
-      updateStatus();
-      syncSongSelectionState();
+      selectSong(nextSong, null);
       importInput.value = "";
       lastSavedLabel = "IMPORT OK";
       updateSaveStatusDisplay();
@@ -1362,6 +1417,18 @@
       }
 
       stepGridPanel.hidden = false;
+
+      if (currentSong.steps.length === 0) {
+        const emptyState = document.createElement("p");
+
+        emptyState.className = "step-grid-empty";
+        emptyState.textContent = "まだ音がありません。Length と Note を選んで Add Note してください。";
+        stepGrid.appendChild(emptyState);
+        updateSelectedStepDisplay();
+        updateNoteSelector();
+        updateEventComposer();
+        return;
+      }
 
       currentSong.steps.forEach((note, index) => {
         const cell = document.createElement("div");
@@ -1561,16 +1628,7 @@
         }
 
         button.addEventListener("click", () => {
-          selectedSongFile = song.file;
-          currentSong = song;
-          selectedStepIndex = 0;
-          console.log("currentSong", currentSong);
-          updateCurrentSongDisplay();
-          renderStepGrid();
-
-          songList.querySelectorAll(".song-item-button").forEach((element) => {
-            element.classList.toggle("is-selected", element.dataset.songFile === selectedSongFile);
-          });
+          selectSong(createEditableSong(song, "built-in"), song.file);
         });
 
         button.append(title, bpm);
@@ -1590,33 +1648,29 @@
             }
 
             const song = await response.json();
-            return normalizeSong({ ...song, file });
+            return createEditableSong({ ...song, file }, "built-in");
           })
         );
 
+        builtInSongs = songs;
+
         if (savedSongSnapshot) {
           if (savedSongSnapshot.file) {
-            const restoredSong = songs.find((song) => song.file === savedSongSnapshot.file);
+            const restoredSong = builtInSongs.find((song) => song.file === savedSongSnapshot.file);
 
             if (restoredSong) {
-              Object.assign(restoredSong, normalizeSong(savedSongSnapshot));
-              selectedSongFile = restoredSong.file;
-              currentSong = restoredSong;
+              selectSong(createEditableSong({
+                ...savedSongSnapshot,
+                file: restoredSong.file
+              }, "built-in"), restoredSong.file);
             }
           } else {
-            currentSong = normalizeSong(savedSongSnapshot);
-            selectedSongFile = null;
-          }
-
-          if (currentSong) {
-            selectedStepIndex = 0;
-            updateCurrentSongDisplay();
-            renderStepGrid();
+            selectSong(createEditableSong(savedSongSnapshot, "user"), null);
           }
         }
 
         songListStatus.textContent = "SELECT A SONG";
-        renderSongList(songs);
+        renderSongList(builtInSongs);
         updateSaveStatusDisplay();
       } catch (error) {
         console.error("Song loading failed", error);
@@ -1704,6 +1758,15 @@
 
       window.setTimeout(() => {
         loopButton.classList.remove("is-pressed");
+      }, 160);
+    });
+
+    newSongButton.addEventListener("click", () => {
+      newSongButton.classList.add("is-pressed");
+      selectSong(createNewSong(), null);
+
+      window.setTimeout(() => {
+        newSongButton.classList.remove("is-pressed");
       }, 160);
     });
 
