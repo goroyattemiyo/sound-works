@@ -212,6 +212,25 @@
       font-size: 0.92rem;
     }
 
+    .song-meta {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.6;
+    }
+
+    .song-item-title {
+      display: block;
+      color: inherit;
+    }
+
+    .song-item-bpm {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 0.76rem;
+    }
+
     .visual {
       min-height: 390px;
       border: 2px solid var(--line);
@@ -334,6 +353,7 @@
           <h2 class="song-panel-title" id="songPanelTitle">Song List</h2>
           <p class="song-list-status" id="songListStatus">LOADING SONGS...</p>
           <p class="song-current" id="currentSongText">CURRENT: NONE</p>
+          <p class="song-meta" id="currentSongMeta">BPM: -- | KEY: -- | ORIGIN: --</p>
           <ul class="song-list" id="songList"></ul>
         </section>
       </div>
@@ -365,6 +385,7 @@
     const songList = document.querySelector("#songList");
     const songListStatus = document.querySelector("#songListStatus");
     const currentSongText = document.querySelector("#currentSongText");
+    const currentSongMeta = document.querySelector("#currentSongMeta");
     const BPM = 120;
     const TOTAL_STEPS = 16;
     const songFiles = [
@@ -384,6 +405,7 @@
     let playbackTimerId = null;
     let selectedSongFile = null;
     let currentSong = null;
+    let isPlaying = false;
 
     function getStepLabel() {
       return currentStep >= 0 ? String(currentStep + 1).padStart(2, "0") : "--";
@@ -391,16 +413,22 @@
 
     function updateStatus() {
       const audioState = audioContext ? audioContext.state.toUpperCase() : "OFF";
-      const playState = playbackTimerId ? "ON" : "OFF";
+      const playState = isPlaying ? "PLAYING" : "IDLE";
 
       statusText.textContent =
-        `AUDIO: ${audioState} | PLAY: ${playState} | STEP: ${getStepLabel()}/${TOTAL_STEPS}`;
+        `AUDIO: ${audioState} | ${playState} | STEP ${getStepLabel()}/${TOTAL_STEPS}`;
+      playButton.textContent = isPlaying ? "Stop" : "Play";
+      playButton.disabled = !currentSong;
     }
 
     function updateCurrentSongDisplay() {
       currentSongText.textContent = currentSong
         ? `CURRENT: ${currentSong.title}`
         : "CURRENT: NONE";
+
+      currentSongMeta.textContent = currentSong
+        ? `BPM: ${currentSong.bpm} | KEY: ${currentSong.key} | ORIGIN: ${currentSong.origin}`
+        : "BPM: -- | KEY: -- | ORIGIN: --";
     }
 
     function stopPlayback() {
@@ -409,6 +437,7 @@
         playbackTimerId = null;
       }
 
+      isPlaying = false;
       currentStep = -1;
       updateStatus();
     }
@@ -518,13 +547,15 @@
     }
 
     function startPlayback() {
-      if (!currentSong) {
+      if (!currentSong || isPlaying) {
         return;
       }
 
       const stepDurationMs = (60 / currentSong.bpm / 4) * 1000;
 
       stopPlayback();
+      isPlaying = true;
+      updateStatus();
       playSongStep(0, stepDurationMs);
     }
 
@@ -534,11 +565,16 @@
       songs.forEach((song) => {
         const item = document.createElement("li");
         const button = document.createElement("button");
+        const title = document.createElement("span");
+        const bpm = document.createElement("span");
 
         button.type = "button";
         button.className = "song-item-button";
-        button.textContent = song.title;
         button.dataset.songFile = song.file;
+        title.className = "song-item-title";
+        title.textContent = song.title;
+        bpm.className = "song-item-bpm";
+        bpm.textContent = `${song.bpm} BPM`;
 
         if (song.file === selectedSongFile) {
           button.classList.add("is-selected");
@@ -555,6 +591,7 @@
           });
         });
 
+        button.append(title, bpm);
         item.appendChild(button);
         songList.appendChild(item);
       });
@@ -604,7 +641,7 @@
 
         updateStatus();
       } catch (error) {
-        statusText.textContent = "AUDIO: ERROR";
+        statusText.textContent = "AUDIO ERROR: START FAILED";
       }
 
       window.setTimeout(() => {
@@ -626,10 +663,15 @@
           await audioContext.resume();
         }
 
-        startPlayback();
+        if (isPlaying) {
+          stopPlayback();
+        } else {
+          startPlayback();
+        }
+
         updateStatus();
       } catch (error) {
-        statusText.textContent = "AUDIO: ERROR";
+        statusText.textContent = "AUDIO ERROR: PLAYBACK FAILED";
       }
 
       window.setTimeout(() => {
